@@ -1,9 +1,8 @@
 # LAPD Open Data Portal fetch functions.
 
 fetch_lapd_dataset <- function(resource_id, where_clause, cache_name) {
-  cache <- cache_path(cache_name)
-  if (!file.exists(cache) || getOption("pipeline.import_raw", FALSE)) {
-    data <- httr2::request(
+  with_cache(cache_name, function() {
+    httr2::request(
       paste0("https://data.lacity.org/resource/", resource_id, ".json")
     ) |>
       httr2::req_url_query(`$limit` = 2000000, `$where` = where_clause) |>
@@ -14,11 +13,7 @@ fetch_lapd_dataset <- function(resource_id, where_clause, cache_name) {
       ) |>
       httr2::req_perform() |>
       httr2::resp_body_json(simplifyVector = TRUE)
-    write_cache(data, cache_name)
-  } else {
-    data <- readRDS(cache)
-  }
-  data
+  })
 }
 
 fetch_lapd_periods <- function(

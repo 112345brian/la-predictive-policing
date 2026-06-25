@@ -51,6 +51,17 @@ write_cache <- function(data, cache_name) {
   invisible(data)
 }
 
+with_cache <- function(cache_name, fn) {
+  cache <- cache_path(cache_name)
+  if (!file.exists(cache) || getOption("pipeline.import_raw", FALSE)) {
+    data <- fn()
+    write_cache(data, cache_name)
+    data
+  } else {
+    readRDS(cache)
+  }
+}
+
 acs_year <- function() {
   as.integer(getOption("pipeline.acs_year", 2024))
 }
