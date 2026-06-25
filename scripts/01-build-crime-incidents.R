@@ -4,6 +4,7 @@
 # and post-PredPol (2022-2024) periods.
 
 source(here::here("scripts", "_pipeline-helpers.R"))
+source(here::here("scripts", "_lapd-api.R"))
 readRenviron(here::here("private", ".Renviron"))
 
 lapd_crimes <- fetch_lapd_periods(
