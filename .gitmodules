@@ -1,0 +1,3 @@
+[submodule "private"]
+	path = private
+	url = https://github.com/112345brian/la-predictive-policing-private.git
