@@ -62,6 +62,13 @@ with_cache <- function(cache_name, fn) {
   }
 }
 
+bind_periods <- function(pre, post) {
+  dplyr::bind_rows(
+    dplyr::mutate(pre,  period = "pre",  is_post = FALSE),
+    dplyr::mutate(post, period = "post", is_post = TRUE)
+  )
+}
+
 acs_year <- function() {
   as.integer(getOption("pipeline.acs_year", 2024))
 }

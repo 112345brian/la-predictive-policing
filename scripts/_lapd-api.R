@@ -39,13 +39,8 @@ fetch_lapd_periods <- function(
   pre <- fetch_lapd_dataset(pre_id, pre_where, pre_cache)
   post <- fetch_lapd_dataset(post_id, post_where, post_cache)
 
-  dplyr::bind_rows(pre, post) |>
+  bind_periods(pre, post) |>
     dplyr::mutate(
-      !!date_field := as.POSIXct(.data[[date_field]]),
-      period = dplyr::case_when(
-        .data[[date_field]] < as.POSIXct("2020-01-01") ~ "pre",
-        .data[[date_field]] >= as.POSIXct("2022-01-01") ~ "post"
-      ),
-      is_post = period == "post"
+      !!date_field := as.POSIXct(.data[[date_field]])
     )
 }

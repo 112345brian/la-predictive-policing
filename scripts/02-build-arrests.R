@@ -5,7 +5,6 @@
 
 source(here::here("scripts", "_pipeline-helpers.R"))
 source(here::here("scripts", "_lapd-api.R"))
-readRenviron(here::here("private", ".Renviron"))
 
 lapd_arrests <- fetch_lapd_periods(
   "yru6-6re4",

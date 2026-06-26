@@ -1,4 +1,5 @@
 source("renv/activate.R")
+readRenviron("private/.Renviron")
 
 options(
   pipeline.import_raw = FALSE, # set TRUE to re-pull from API instead of cache
