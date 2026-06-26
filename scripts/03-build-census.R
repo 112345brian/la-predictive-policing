@@ -3,6 +3,8 @@
 
 source(here::here("scripts", "_pipeline-helpers.R"))
 
+tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"))
+
 fetch_acs_race <- function(year) {
   with_cache(paste0("acs-race-", year, "-raw.rds"), function() {
     tidycensus::get_acs(
