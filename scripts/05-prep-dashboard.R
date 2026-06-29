@@ -7,6 +7,7 @@ crime_counts <- lapd_spatial |>
   dplyr::count(GEOID)
 
 dashboard_data <- tracts |>
-  dplyr::left_join(crime_counts, by = "GEOID")
+  dplyr::left_join(crime_counts, by = "GEOID") |>
+  sf::st_transform(4326)
 
 saveRDS(dashboard_data, here::here("data", "processed", "dashboard-data.rds"))

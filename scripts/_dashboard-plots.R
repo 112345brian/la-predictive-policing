@@ -1,6 +1,4 @@
 plot_crime_counts <- function(data) {
-  data <- sf::st_transform(data, 4326)
-
   pal <- leaflet::colorNumeric("viridis", domain = data$n, na.color = "#E0E0E0")
 
   leaflet::leaflet(data) |>
