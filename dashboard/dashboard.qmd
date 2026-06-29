@@ -1,23 +1,13 @@
 ---
 title: "LA Predictive Policing"
+format: dashboard
 ---
 
-```{r}
-lapd_spatial <- readRDS(here::here("data", "processed", "lapd-spatial.rds"))
+```{r setup, include=FALSE}
+source(here::here("scripts", "_dashboard-plots.R"))
+dashboard_data <- readRDS(here::here("data", "processed", "dashboard-data.rds"))
 ```
 
 ```{r}
-crime_counts <- lapd_spatial |>
-  sf::st_drop_geometry() |>
-  dplyr::filter(type == "crime") |>
-  dplyr::count(GEOID)
-
-tracts <- readRDS(here::here("data", "cache", "tracts-post.rds"))
-
-tracts |>
-  dplyr::left_join(crime_counts, by = "GEOID") |>
-  ggplot2::ggplot(ggplot2::aes(fill = n)) +
-  ggplot2::geom_sf(color = NA) +
-  ggplot2::scale_fill_viridis_c(na.value = "grey90") +
-  ggplot2::theme_void()
+plot_crime_counts(dashboard_data)
 ```
