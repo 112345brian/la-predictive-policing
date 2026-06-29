@@ -1,13 +1,57 @@
 ---
 title: "LA Predictive Policing"
 format: dashboard
+server: shiny
 ---
 
 ```{r setup, include=FALSE}
+library(ggplot2)
+library(shiny)
 source(here::here("scripts", "_dashboard-plots.R"))
-dashboard_data <- readRDS(here::here("data", "processed", "dashboard-data.rds"))
+m <- readRDS(here::here("data", "processed", "dashboard-data.rds"))
+dashboard_data <- m$dashboard_data
+year_min <- m$year_min
+year_max <- m$year_max
+```
+
+# Map
+
+## Row
+
+```{r}
+#| title: !expr paste0("Crimes per Year by Tract (", year_min, "–", year_max, ")")
+leaflet::leafletOutput("crime_map")
+```
+
+# Analysis
+
+## Row
+
+```{r}
+#| title: Crimes per Year vs. % Black + Hispanic by Tract
+plotOutput("race_scatter")
 ```
 
 ```{r}
-plot_crime_counts(dashboard_data)
+#| title: Racial Distribution of Low-, Mid-, and High-Crime Tracts
+radioButtons("crime_tier", label = NULL,
+  choices = c("Low", "Mid", "High"),
+  selected = "High", inline = TRUE
+)
+plotOutput("racial_dist")
+```
+
+```{r}
+#| context: server
+output$race_scatter <- renderPlot({
+  plot_crime_by_race(dashboard_data)
+})
+
+output$crime_map <- leaflet::renderLeaflet({
+  plot_crime_counts(dashboard_data)
+})
+
+output$racial_dist <- renderPlot({
+  plot_racial_distribution(dashboard_data, tier = input$crime_tier)
+})
 ```
