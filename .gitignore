@@ -5,6 +5,5 @@
 .DS_Store
 .quarto
 data/
-walkability_dashboard.Rmd
 dashboard/*.html
 dashboard/*_files/
