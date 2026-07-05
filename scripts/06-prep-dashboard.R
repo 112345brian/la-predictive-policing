@@ -1,3 +1,5 @@
+source(here::here("scripts", "_pipeline-helpers.R"))
+
 lapd_spatial <- readRDS(here::here("data", "processed", "lapd-spatial.rds"))
 tracts <- readRDS(here::here("data", "cache", "tracts-post.rds"))
 
@@ -26,10 +28,16 @@ acs_race <- readRDS(here::here("data", "processed", "acs-race.rds")) |>
     hispanic_or_latinoE
   )
 
+neighborhood_lookup <- lapd_spatial |>
+  sf::st_drop_geometry() |>
+  dplyr::filter(!is.na(neighborhood)) |>
+  dplyr::distinct(GEOID, neighborhood)
+
 dashboard_data <- tracts |>
   dplyr::filter(!grepl("^\\d{5}98", GEOID)) |>
   dplyr::left_join(crime_counts, by = "GEOID") |>
   dplyr::left_join(acs_race, by = "GEOID") |>
+  dplyr::left_join(neighborhood_lookup, by = "GEOID") |>
   dplyr::filter(is.na(n) | is.na(totalE) | totalE == 0 | (n / totalE) < 1) |> # Keep this filter to take out non-residential or institutional tracts.
   dplyr::mutate(crimes_per_year = n / n_years) |>
   sf::st_transform(4326)

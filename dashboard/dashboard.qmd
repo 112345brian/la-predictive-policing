@@ -34,11 +34,19 @@ plotOutput("race_scatter")
 
 ```{r}
 #| title: Racial Distribution of Low-, Mid-, and High-Crime Tracts
-radioButtons("crime_tier", label = NULL,
+radioButtons(
+  "crime_tier",
+  label = NULL,
   choices = c("Low", "Mid", "High"),
-  selected = "High", inline = TRUE
+  selected = "High",
+  inline = TRUE
 )
 plotOutput("racial_dist")
+```
+
+```{r}
+#| title: Top 10 Highest-Crime Tracts
+uiOutput("crime_table")
 ```
 
 ```{r}
@@ -53,5 +61,9 @@ output$crime_map <- leaflet::renderLeaflet({
 
 output$racial_dist <- renderPlot({
   plot_racial_distribution(dashboard_data, tier = input$crime_tier)
+})
+
+output$crime_table <- renderUI({
+  make_crime_table(dashboard_data)
 })
 ```

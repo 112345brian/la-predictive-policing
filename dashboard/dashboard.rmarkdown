@@ -1,0 +1,39 @@
+---
+title: "LA Predictive Policing"
+format: dashboard
+server: shiny
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(shiny)
+source(here::here("scripts", "_dashboard-plots.R"))
+dashboard_data <- readRDS(here::here("data", "processed", "dashboard-data.rds"))
+```
+
+## Row
+
+```{r}
+#| title: Crime Counts by Tract
+plot_crime_counts(dashboard_data)
+```
+
+```{r}
+#| title: Racial Distribution of Low-, Mid-, and High-Crime Tracts
+radioButtons(
+  "crime_tier",
+  label = NULL,
+  choices = c("Low", "Mid", "High"),
+  selected = "High",
+  inline = TRUE
+)
+plotOutput("racial_dist")
+```
+
+```{r}
+#| context: server
+output$racial_dist <- renderPlot({
+  plot_racial_distribution(dashboard_data, tier = input$crime_tier)
+})
+```
+

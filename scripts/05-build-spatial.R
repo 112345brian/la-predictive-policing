@@ -1,4 +1,5 @@
-# Spatial join of LAPD incidents to census tracts and ACS demographics.
+# Spatial join of LAPD incidents to census tracts, ACS demographics, and neighborhoods.
+# Requires 04-build-neighborhoods.R to have run first.
 
 source(here::here("scripts", "_pipeline-helpers.R"))
 
@@ -10,6 +11,8 @@ lapd <- dplyr::bind_rows(
   dplyr::mutate(lapd_crimes, type = "crime"),
   dplyr::mutate(lapd_arrests, type = "arrest")
 )
+
+neighborhoods <- readRDS(processed_path("neighborhoods.rds"))
 
 tracts_pre <- with_cache("tracts-pre.rds", function() {
   tigris::tracts(state = "CA", county = "Los Angeles", year = 2019) |>
@@ -32,6 +35,10 @@ lapd_spatial <- dplyr::bind_rows(
   join_to_tracts(dplyr::filter(lapd, period == "pre"), tracts_pre),
   join_to_tracts(dplyr::filter(lapd, period == "post"), tracts_post)
 ) |>
-  dplyr::left_join(acs_race, by = c("GEOID", "period"))
+  dplyr::left_join(acs_race, by = c("GEOID", "period")) |>
+  sf::st_join(neighborhoods, join = sf::st_intersects, left = TRUE) |>
+  dplyr::group_by(dr_no) |>
+  dplyr::slice_max(sf::st_area(geometry), n = 1, with_ties = FALSE) |>
+  dplyr::ungroup()
 
 write_processed_dataset(lapd_spatial, "lapd-spatial.rds")

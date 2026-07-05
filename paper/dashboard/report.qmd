@@ -1,0 +1,31 @@
+---
+title: "Policing Spatial Concentration Before and After PredPol"
+subtitle: "AS.703 EDA Dashboard Assignment"
+author: "Brian Powers"
+format: pdf
+bibliography: references.bib
+---
+
+## Dashboard Components
+
+### Choropleth Map
+
+The map displays average annual crime incidents per census tract, computed by dividing total incident counts by the number of years covered (2015–2024, excluding 2020–2021). Non-residential and institutional tracts (identified by the Census Bureau's 98xx tract numbering convention and by an implausibly high crimes-to-population ratio) are excluded to prevent outlier locations (airports, jail complexes) from compressing the color scale. Hovering over a tract displays the neighborhood name, tract ID, and annualized crime rate.
+
+### Scatter Plot
+
+The scatter plot shows the relationship between the share of a tract's population that is Black or Hispanic (horizontal axis) and the annualized crime count (vertical axis), with an OLS regression line overlaid. The positive slope illustrates the central empirical pattern: recorded crime tends to be higher in majority-minority neighborhoods. This provides a tract-level complement to the choropleth and contextualizes the spatial patterns within the racial disparities documented by @lum-isaac_2016_to-predict-and-serve.
+
+### Bar Chart
+
+The interactive bar chart displays the racial composition of tracts grouped into low-, mid-, and high-crime tertiles, allowing direct comparison of demographic profiles across the crime distribution. The comparison makes visible whether high-crime tracts are disproportionately minority relative to low-crime tracts, a pattern consistent with either differential crime rates or differential policing intensity, or both.
+
+### Table
+
+The table lists the ten census tracts with the highest annualized crime rates, along with their neighborhood name, population, and share of Black and Hispanic residents. The table grounds the aggregate patterns in specific places.
+
+## Variable Choices
+
+The annualized crime rate (rather than total counts) is used throughout to make figures interpretable on a per-year basis and to account for the unequal length of the pre- and post-periods. Black and Hispanic population shares are combined into a single variable because they are jointly the focus of existing literature on PredPol's disparate impact [@lum-isaac_2016_to-predict-and-serve; @the-markup_2021_how-we-determined]. The choice of census tract as the unit of analysis follows the available spatial granularity of the ACS data and is consistent with prior work in this area.
+
+## References
