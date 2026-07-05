@@ -6,19 +6,6 @@ format: pdf
 bibliography: references.bib
 ---
 
-## Guidelines
-
-Your paper should be around 2-3 pages long (12-point font, 1-inch margins). The paper should be long enough to answer the prompts. Do not just write bullet points (although you could do that to start) but rather create a comprehensive "report" about a predictive policing department or technique (using paragraphs and sentences).
-
-**Grading Criteria:**
-
-- **A**: Excellent and well developed analysis, written at a graduate level, supports arguments with evidence, strong written composition skills.
-- **A-**: Some room for improvement with precision, clarity, or originality/creativity of submission. Some minor, readily correctible errors in writing.
-- **B+/B/B-**: Lacking in content, deficient in style/composition.
-- **C or F**: Incomplete, little if any connection to course content, and/or distracting errors in composition.
-
-------------------------------------------------------------------------
-
 - my department is lapd
 - what are the predictive policing features?
   - PredPol: place-based predictive policing algorithm
@@ -56,8 +43,10 @@ Your paper should be around 2-3 pages long (12-point font, 1-inch margins). The 
   - value proposition (efficient, race-neutral resource allocation) is undermined if training data itself is contaminated by the feedback loop described above
   - cannot cleanly attribute any change (or lack of change) after discontinuation to the algorithm specifically
     - removal in April 2020 is confounded with COVID-19, the George Floyd protests/national policing reckoning, and LAPD budget/consent-decree pressure
-    - if PredPol really drove concentration, removal should attenuate disparity "all else equal" - but all else was not equal at that cutoff
   - what should they have done instead?
     - any algorithmic tool trained on police-generated records (arrests, recorded incidents) will reproduce the same feedback loop; a technical fix requires ground-truth crime data independent of policing intensity, which does not exist at fine geography
     - open question, not resolved in our research so far
     - seems like they should team with NGOs for surveying where crimes are over/underreported to make policing correspond
+- what's still missing here?
+  - successes beyond [@mohler-etal_2015_randomized-controlled-field]: Atlanta pilot (~8-9% crime decline in treated zones vs. rising in untreated zones, prompting citywide expansion), Santa Cruz (~20% burglary decline in first six months), Kent UK (~4% overall crime reduction). All contested by RAND Corporation and a 2012 Shreveport, LA randomized trial, both finding no statistically significant crime reduction; [@mohler-etal_2015_randomized-controlled-field] itself included authors with a financial stake in PredPol Inc., a conflict worth naming rather than hiding.
+  - due process: PredPol itself is place-based, so it raises Fourth Amendment/equal-protection concerns about concentrated stops rather than classic due-process ones (no individual is notified or given a chance to contest); DICFP's ACCIC/CAPRA units trace back to Operation LASER's person-based "Chronic Offender" infrastructure [@stop-lapd-spying-coalition_2021_automating-banishment], so DICFP inherits person-based due-process exposure alongside PredPol's place-based legacy
