@@ -1,0 +1,63 @@
+---
+title: "AS.703 Evaluation"
+subtitle: "AS.703 EDA Dashboard Assignment"
+author: "Brian Powers"
+format: pdf
+bibliography: references.bib
+---
+
+## Guidelines
+
+Your paper should be around 2-3 pages long (12-point font, 1-inch margins). The paper should be long enough to answer the prompts. Do not just write bullet points (although you could do that to start) but rather create a comprehensive "report" about a predictive policing department or technique (using paragraphs and sentences).
+
+**Grading Criteria:**
+
+- **A**: Excellent and well developed analysis, written at a graduate level, supports arguments with evidence, strong written composition skills.
+- **A-**: Some room for improvement with precision, clarity, or originality/creativity of submission. Some minor, readily correctible errors in writing.
+- **B+/B/B-**: Lacking in content, deficient in style/composition.
+- **C or F**: Incomplete, little if any connection to course content, and/or distracting errors in composition.
+
+------------------------------------------------------------------------
+
+- my department is lapd
+- what are the predictive policing features?
+  - PredPol: place-based predictive policing algorithm
+  - used by LAPD roughly 2011 to April 2020
+  - predicted crime at fine spatial grain (\~500ft grid cells), recalculated per shift
+  - directed patrol resources to predicted cells/hotspots
+  - discontinued April 2020, suspended by Chief Michel Moore under scrutiny over racial bias
+- what were the problems with these features?
+  - [@the-markup_2021_how-we-determined] found PredPol predictions disproportionately targeted low-income Black and Latino neighborhoods
+  - [@lum-isaac_2016_to-predict-and-serve], "To Predict and Serve?": place-based predictive tools trained on police-recorded crime/calls-for-service, not independent crime data
+    - reported crime is partly a product of policing intensity itself (more patrol -\> more discovery of low-level offenses -\> more recorded incidents -\> algorithm flags area again) -\> feedback loop
+  - victim reporting itself is not a clean baseline: reporting rates suppressed in over-policed and immigrant communities due to distrust of police
+    - low report counts in some tracts can mean underreporting, not less crime
+  - no available data source (police records, calls for service, victimization surveys) offers unpolluted ground truth on true crime location at fine geography
+  - two competing interpretations of PredPol's role (not resolved by available data):
+    - algorithm-as-driver: PredPol independently concentrated policing beyond what existing patrol patterns would have produced
+    - algorithm-as-encoder: PredPol encoded pre-existing patrol biases; underlying deployment logic didn't change when algorithm was introduced
+- places of transparency
+  - underlying crime incident and arrest data are public via data.lacity.org (LAPD Crime Incidents, LAPD Arrest data)
+  - the discontinuation decision itself was public and attributed to a named official (Chief Michel Moore) citing racial bias scrutiny
+  - why are they transparent
+    - open data portal requirements / public records norms for crime and arrest logs
+    - media/investigative scrutiny (Markup's 2021 analysis) forced public accounting of the program's disparate impact
+- places where there is no transparency
+  - the algorithm's actual predicted outputs (box-level, per-shift predictions) were not systematically public
+    - Markup only obtained fragments via records requests for specific divisions/periods, not a full city-wide panel
+  - no public data links predicted boxes to actual officer dispatch/patrol behavior
+    - can't verify whether officers actually complied with or acted on the algorithm's predictions (a mechanism/compliance question)
+  - post-2020 there is no PredPol output at all to audit against, since the algorithm no longer runs
+  - what are the reasons these places aren't transparent?
+    - PredPol Inc. is a private vendor; no requirement to disclose proprietary model outputs
+    - no systematic public disclosure requirement for algorithmic policing tools' internal predictions or compliance data
+- is this a good use of predictive policing?
+  - in theory, predictive policing should reduce crime overall [@mohler-etal_2015_randomized-controlled-field]
+  - value proposition (efficient, race-neutral resource allocation) is undermined if training data itself is contaminated by the feedback loop described above
+  - cannot cleanly attribute any change (or lack of change) after discontinuation to the algorithm specifically
+    - removal in April 2020 is confounded with COVID-19, the George Floyd protests/national policing reckoning, and LAPD budget/consent-decree pressure
+    - if PredPol really drove concentration, removal should attenuate disparity "all else equal" - but all else was not equal at that cutoff
+  - what should they have done instead?
+    - any algorithmic tool trained on police-generated records (arrests, recorded incidents) will reproduce the same feedback loop; a technical fix requires ground-truth crime data independent of policing intensity, which does not exist at fine geography
+    - open question, not resolved in our research so far
+    - seems like they should team with NGOs for surveying where crimes are over/underreported to make policing correspond

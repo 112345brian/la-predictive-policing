@@ -1,5 +1,5 @@
 ---
-title: "AS.703 LA Project - Policing Spatial Concentration Before and After PredPol"
+title: "AS.703 LA Project - Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
 subtitle: "AS.703 EDA Dashboard Assignment"
 author: "Brian Powers"
 format: pdf
@@ -8,24 +8,26 @@ bibliography: references.bib
 
 ## Core Question
 
-Did the spatial concentration of LAPD policing activity in Black and Latino neighborhoods change after the discontinuation of PredPol in April 2020 — and does any change (or lack of change) persist into 2022–2024, past any plausible lagged effect of the algorithm?
+Does LAPD's Data-Informed Community-Focused Policing (DICFP) program — which replaced PredPol in April 2020 — show a measurable break from the prior era's spatial concentration of policing activity in Black and Latino neighborhoods, consistent with DICFP's stated goals of building trust, reducing violent crime, and assisting victims? Or does enforcement continue along the same spatial lines, past any plausible lagged effect of PredPol itself?
 
 ## Why This Question
 
-LAPD used PredPol, a place-based predictive policing algorithm, from roughly 2011 until April 2020, when Chief Michel Moore suspended the program under scrutiny over racial bias. The algorithm predicted crime at the block-group level and directed patrol resources accordingly.
+LAPD used PredPol, a place-based predictive policing algorithm, from roughly 2011 until April 2020. Per an internal memo dated April 15, 2020, Chief Michel Moore discontinued PredPol effective immediately, attributing the decision to the city's COVID-19 financial crisis and mayoral belt-tightening — not the racial-bias scrutiny activists and journalists were raising at the same time. LAPD replaced it with "Data-Informed Community-Focused Policing" (DICFP), stated around three goals: building trust between police and the public, reducing violent (gun/gang) crime, and assisting crime victims. Moore said he still believed in location-based strategies going forward.
 
-Two interpretations of PredPol's spatial effects are possible:
+Critics (the Brennan Center for Justice; the Automating Banishment project) argue DICFP borrows its targeting logic from Operation LASER, LAPD's earlier person-based program, and continues to direct enforcement toward areas with already-high call volume — i.e., automating the same underlying logic rather than reforming it. That claim has been made qualitatively but not tested against tract-level enforcement data.
 
-- **Algorithm-as-driver**: PredPol independently concentrated policing in certain neighborhoods beyond what existing patrol patterns would have produced. Under this view, removing the algorithm should shift spatial distributions.
-- **Algorithm-as-encoder**: PredPol encoded pre-existing patrol biases. Under this view, spatial concentration should persist after removal because the underlying deployment logic didn't change.
+Two competing interpretations of DICFP are possible:
+
+- **Genuine reform**: DICFP reflects a substantively different deployment logic aimed at its stated goals. Under this view, spatial concentration should shift relative to the PredPol era.
+- **Cosmetic rebrand**: DICFP inherits PredPol/LASER's targeting logic under a new name. Under this view, spatial concentration should persist unchanged despite the stated goals.
 
 The before/after structure of LAPD's public data allows a descriptive test of which pattern is more consistent with the evidence.
 
 ## What Has Already Been Done
 
-The obvious version of this project — disparate impact analysis of PredPol predictions at the census block group level — was done by [The Markup in 2021](https://themarkup.org/show-your-work/2021/12/02/how-we-determined-crime-prediction-software-disproportionately-targeted-low-income-black-and-latino-neighborhoods). [DaViera (2024)](https://onlinelibrary.wiley.com/doi/full/10.1002/ajcp.12671) analyzed the Strategic Subject List (a person-based tool) using CRT framework. Both are pre-discontinuation or tool-specific.
+The obvious version of this project — disparate impact analysis of PredPol predictions at the census block group level — was done by [The Markup in 2021](https://themarkup.org/show-your-work/2021/12/02/how-we-determined-crime-prediction-software-disproportionately-targeted-low-income-black-and-latino-neighborhoods). [DaViera (2024)](https://onlinelibrary.wiley.com/doi/full/10.1002/ajcp.12671) analyzed the Strategic Subject List (a person-based tool) using CRT framework. The Brennan Center and the Automating Banishment project have argued qualitatively that DICFP is a continuation of PredPol/LASER-era logic under a new name. None of these quantitatively test DICFP-era (2022–2024) enforcement data against the PredPol-era baseline at the tract level.
 
-The post-PredPol era (2022–2024) spatial distribution of policing under the current regime is less studied. That's the gap.
+That's the gap.
 
 ## Data
 
@@ -41,13 +43,13 @@ Unit of analysis: census tract or LAPD division (TBD based on data granularity).
 
 Three time periods:
 
-| Period                 | Years     | Label               |
-|------------------------|-----------|---------------------|
-| Pre-PredPol suspension | 2015–2019 | Pre                 |
-| Transition / COVID     | 2020–2021 | Excluded or dummied |
-| Post-PredPol           | 2022–2024 | Post                |
+| Period                    | Years     | Label               |
+|---------------------------|-----------|---------------------|
+| PredPol era               | 2015–2019 | Pre                 |
+| DICFP implementation/COVID| 2020–2021 | Excluded or dummied |
+| DICFP era                 | 2022–2024 | Post                |
 
-The COVID/transition period is handled by either dropping 2020–2021 entirely or including a binary dummy — this separates any distributional change from pandemic-era shifts in crime and patrol patterns. Patterns that persist through 2022–2024 cannot plausibly be attributed to PredPol's lagged effects.
+The COVID/implementation period is handled by either dropping 2020–2021 entirely or including a binary dummy — this separates any distributional change from pandemic-era shifts in crime and patrol patterns. Patterns that persist through 2022–2024 cannot plausibly be attributed to a lagged effect of PredPol itself, since DICFP has been the operative program for that entire window.
 
 ## Outcome Variable Options
 
@@ -69,7 +71,7 @@ LA's demographic heterogeneity, which makes it a bad choice for many projects, i
 
 ## Key Limitation
 
-This is descriptive, not causal. Even a clean before/after shift cannot be attributed to PredPol's removal — other factors (department policy changes, budget, political pressure) also changed around 2020. The claim is interpretive, not causal, and needs to be framed accordingly.
+This is descriptive, not causal. Even a clean before/after shift cannot be cleanly attributed to DICFP's introduction — its rollout is confounded with the same COVID-19 disruption and fiscal crisis that prompted it, plus the 2020 policing reckoning that followed shortly after. Framing the question as an evaluation of DICFP against its own stated goals (rather than as a test of "the effect of removing PredPol") avoids mischaracterizing LAPD's motive, but it does not resolve this timing confound. The claim is interpretive, not causal, and needs to be framed accordingly.
 
 ## Fit With Existing Portfolio
 
