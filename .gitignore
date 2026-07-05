@@ -7,3 +7,18 @@
 data/
 dashboard/*.html
 dashboard/*_files/
+
+# LaTeX/PDF build artifacts
+paper/**/*.pdf
+paper/**/*.tex
+paper/**/*.aux
+paper/**/*.log
+paper/**/*.out
+paper/**/*.toc
+paper/**/*.lof
+paper/**/*.lot
+paper/**/*.bbl
+paper/**/*.blg
+paper/**/*.fdb_latexmk
+paper/**/*.fls
+paper/**/*.synctex.gz
