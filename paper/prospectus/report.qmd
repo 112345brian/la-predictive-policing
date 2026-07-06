@@ -1,0 +1,36 @@
+---
+title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
+shorttitle: "Policing Spatial Concentration Under DICFP"
+author:
+  - name: Brian Powers
+    corresponding: true
+    affiliations:
+      city: Los Angeles
+      region: CA
+documentmode: stu
+course: "AS.703 Urban Data Analytics"
+professor: "Eric Lindgren"
+duedate: "July 6, 2026"
+bibliography: ../references.bib
+suppress-author-note: true
+format:
+  apaquarto-pdf: default
+---
+
+This project investigates the Los Angeles Police Department. It focuses on the problem of overpolicing tied to LAPD's use of predictive policing. LAPD used PredPol, a place-based predictive policing algorithm, from roughly 2011 until April 2020. It was then discontinued and replaced by Data-Informed, Community-Focused Policing (DICFP). DICFP was stated to aim at building trust, reducing violent crime, and assisting victims.
+
+Two competing interpretations of DICFP are possible. It could reflect a substantively different deployment logic aimed at those stated goals. If so, spatial concentration of enforcement should shift relative to the PredPol era. Or it could inherit PredPol's targeting logic under a new name. If so, spatial concentration should persist unchanged despite the stated goals. The before/after structure of LAPD's public data allows a descriptive test of which pattern is more consistent with the evidence.
+
+The variables used will be the rate of reported overpolicing and the rate of crime. Both are ratio-level rates, such as arrests per capita or the arrest-to-reported-crime ratio, aggregated by time period. These variables are relevant because arrest rates alone mostly reflect police activity and discretion, but not underlying risk. A tract can show high arrests simply because it received more patrol, independent of how much crime actually occurred there. Therefore, reported crime is an imperfect but partially independent baseline, since much of it is initiated by victims rather than by officer presence. The ratio of arrests to reported crime nets out some of that endogeneity. It flags tracts where enforcement activity exceeds what the reported crime in that tract would predict. That makes it a more direct proxy for overpolicing than arrest counts alone. The unit of analysis will be the census tract, which matches the granularity of ACS demographic data. LAPD division will serve as a fallback, depending on the granularity of the crime and arrest data. These will be drawn from LAPD's crime data [@los-angeles-police-department_2024_crime-data-2010; @los-angeles-police-department_2024_crime-data-2020] and arrest data [@los-angeles-police-department_2024_arrest-data-2010; @los-angeles-police-department_2024_arrest-data-2020], the American Community Survey's 5-year estimates [@u-s-census-bureau_2020_american-community-survey; @u-s-census-bureau_2024_american-community-survey], TIGER/Line shapefiles for census tracts in Los Angeles County [@u-s-census-bureau_2024_tiger-line-shapefiles], and LA Times neighborhood boundaries [@los-angeles-times_2024_times-neighborhood-boundaries].
+
+The analysis will compare three periods: the PredPol era (2015-2019), the DICFP implementation period, which overlaps with COVID-19 (2020-2021), and the DICFP era (2022-2024). The middle period will either be dropped or included as a dummy variable. That separates any distributional change from pandemic-era shifts in crime and patrol patterns. Patterns that persist through 2022-2024 would not plausibly be attributed to a lagged effect of PredPol itself, since DICFP would have been the operative program for that entire window.
+
+I expect to find that PredPol did not reduce overpolicing over time. I also expect the new program, DICFP, to either slightly reduce overpolicing or show no change.
+
+The most direct prior version of this project was already done by the Markup [-@the-markup_2021_how-we-determined]. It was a disparate-impact analysis of PredPol's predictions at the census block group level. Critics have separately argued, on qualitative grounds, that DICFP simply continues PredPol's targeting logic under a new name. But that claim has not been tested against tract-level enforcement data. The post-PredPol era of policing under DICFP is comparatively understudied. Quantitatively comparing DICFP-era enforcement data against the PredPol-era baseline at the tract level is the gap this project is positioned to fill.
+
+Background and theory for this project will draw on five additional sources. These are Lum and Isaac's [-@lum-isaac_2016_to-predict-and-serve] critique of the feedback loop in predictive policing, Mohler et al.'s [-@mohler-etal_2015_randomized-controlled-field] randomized controlled trial of PredPol, the Markup's [-@the-markup_2021_how-we-determined] investigation into PredPol's disparate impact, LAPD's own guidebook on Data-Informed, Community-Focused Policing [-@los-angeles-police-department_2020_data-informed-community-focused], and the Stop LAPD Spying Coalition's [-@stop-lapd-spying-coalition_2021_automating-banishment] report on automating banishment.
+
+\newpage
+
+## References

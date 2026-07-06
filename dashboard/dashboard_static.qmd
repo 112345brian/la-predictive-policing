@@ -1,0 +1,64 @@
+---
+title: "LA Predictive Policing"
+format:
+  dashboard:
+    embed-resources: true
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+source(here::here("scripts", "_dashboard-plots.R"))
+m <- readRDS(here::here("data", "processed", "dashboard-data.rds"))
+dashboard_data <- m$dashboard_data
+year_min <- m$year_min
+year_max <- m$year_max
+```
+
+# Map
+
+## Row
+
+```{r}
+#| title: !expr paste0("Crimes per Year by Tract (", year_min, "–", year_max, ")")
+plot_crime_counts(dashboard_data)
+```
+
+# Analysis
+
+## Row
+
+```{r}
+#| title: Crimes per Year vs. % Black + Hispanic by Tract
+plot_crime_by_race(dashboard_data)
+```
+
+## Row
+
+::: {.panel-tabset title="Racial Distribution of Low-, Mid-, and High-Crime Tracts"}
+
+### High
+
+```{r}
+plot_racial_distribution(dashboard_data, tier = "High")
+```
+
+### Mid
+
+```{r}
+plot_racial_distribution(dashboard_data, tier = "Mid")
+```
+
+### Low
+
+```{r}
+plot_racial_distribution(dashboard_data, tier = "Low")
+```
+
+:::
+
+## Row
+
+```{r}
+#| title: Top 10 Highest-Crime Tracts
+make_crime_table(dashboard_data)
+```

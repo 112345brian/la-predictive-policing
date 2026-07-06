@@ -1,9 +1,13 @@
 ---
-title: "AS.703 LA Project - Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
-subtitle: "AS.703 EDA Dashboard Assignment"
-author: "Brian Powers"
-format: pdf
+title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
+shorttitle: "Policing Spatial Concentration Under DICFP"
+author:
+  - name: Brian Powers
+documentmode: stu
+course: "AS.703 Urban Data Analytics"
 bibliography: references.bib
+format:
+  apaquarto-pdf: default
 ---
 
 - which area are you investigating?
