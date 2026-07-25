@@ -7,6 +7,10 @@
 data/
 dashboard/*.html
 dashboard/*_files/
+paper/*.html
+paper/**/*_files/
+**/rsconnect/
+Rplots.pdf
 
 # LaTeX/PDF build artifacts
 paper/**/*.pdf
