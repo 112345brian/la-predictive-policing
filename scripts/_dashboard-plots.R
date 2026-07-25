@@ -120,8 +120,11 @@ plot_crime_counts <- function(data) {
       color = NA,
       label = ~ paste0(
         ifelse(is.na(neighborhood), "Unknown", neighborhood),
-        " (Tract ", substr(GEOID, 6, 11), ")",
-        "\n", ifelse(is.na(crimes_per_year), "no data", round(crimes_per_year, 1)),
+        " (Tract ",
+        substr(GEOID, 6, 11),
+        ")",
+        "\n",
+        ifelse(is.na(crimes_per_year), "no data", round(crimes_per_year, 1)),
         " crimes/yr"
       )
     ) |>

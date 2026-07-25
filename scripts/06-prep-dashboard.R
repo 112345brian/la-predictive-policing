@@ -28,10 +28,15 @@ acs_race <- readRDS(here::here("data", "processed", "acs-race.rds")) |>
     hispanic_or_latinoE
   )
 
+# Pick themodal (most common) neighborhood per tract instead, so each
+#  GEOID maps to exactly one neighborhood.
+
 neighborhood_lookup <- lapd_spatial |>
   sf::st_drop_geometry() |>
   dplyr::filter(!is.na(neighborhood)) |>
-  dplyr::distinct(GEOID, neighborhood)
+  dplyr::count(GEOID, neighborhood) |>
+  dplyr::slice_max(n, by = GEOID, n = 1, with_ties = FALSE) |>
+  dplyr::select(GEOID, neighborhood)
 
 dashboard_data <- tracts |>
   dplyr::filter(!grepl("^\\d{5}98", GEOID)) |>
