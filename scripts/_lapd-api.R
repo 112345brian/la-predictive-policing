@@ -16,6 +16,37 @@ fetch_lapd_dataset <- function(resource_id, where_clause, cache_name) {
   })
 }
 
+fetch_lapd_window <- function(
+  pre_id,
+  post_id,
+  date_field,
+  start,
+  end,
+  split,
+  cache_name
+) {
+  where_clause <- paste0(
+    date_field, " >= '", start, "T00:00:00' AND ",
+    date_field, " < '", end, "T00:00:00'"
+  )
+
+  with_cache(cache_name, function() {
+    dplyr::bind_rows(
+      fetch_lapd_dataset(
+        pre_id,
+        paste0(where_clause, " AND ", date_field, " < '", split, "T00:00:00'"),
+        paste0("window-", cache_name, "-pre.rds")
+      ),
+      fetch_lapd_dataset(
+        post_id,
+        paste0(where_clause, " AND ", date_field, " >= '", split, "T00:00:00'"),
+        paste0("window-", cache_name, "-post.rds")
+      )
+    ) |>
+      dplyr::mutate(!!date_field := as.POSIXct(.data[[date_field]]))
+  })
+}
+
 fetch_lapd_periods <- function(
   pre_id,
   post_id,
