@@ -1,9 +1,0 @@
----
-title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
-shorttitle: "Initial Findings"
-author:
-  - name: Brian Powers
-course: "AS.703 Urban Data Analytics"
-bibliography: references.bib
-format: html
----
