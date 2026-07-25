@@ -3,7 +3,7 @@ title: "Policing Spatial Concentration Before and After PredPol"
 subtitle: "AS.703 EDA Dashboard Assignment"
 author: "Brian Powers"
 format: pdf
-bibliography: references.bib
+bibliography: ../references.bib
 ---
 
 ## Dashboard Components

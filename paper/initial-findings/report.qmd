@@ -1,0 +1,90 @@
+---
+title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
+shorttitle: "Initial Findings"
+author:
+  - name: Brian Powers
+course: "AS.703 Urban Data Analytics"
+bibliography: ../references.bib
+format: html
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(ggplot2)
+here::i_am("paper/initial-findings/report.qmd")
+
+m <- readRDS(here::here("data", "processed", "period-comparison.rds"))
+arrest_over_crime <- m$arrest_over_crime
+n_years <- m$n_years
+```
+
+## Background
+
+LAPD ran PredPol, a place-based predictive policing program, from 2011 to 2020 [@mohler-etal_2015_randomized-controlled-field]. It was discontinued that April, driven by COVID-era budget cuts and by criticism that it concentrated enforcement in already over-policed neighborhoods regardless of underlying crime rates [@stop-lapd-spying-coalition_2021_automating-banishment; @the-markup_2021_how-we-determined; @lum-isaac_2016_to-predict-and-serve]. LAPD replaced it that same month with Data-Informed, Community-Focused Policing (DICFP), whose stated goals were building trust, reducing violent crime, and assisting victims [@los-angeles-police-department_2020_data-informed-community-focused]. Optimists read DICFP as a genuine break from PredPol's targeting logic; pessimists read it as the same logic under a new name. This project tests which reading the tract-level enforcement data supports.
+
+## Findings
+
+```{r}
+#| label: tbl-period-comparison
+#| tbl-cap: "Arrest-to-crime ratio by era"
+
+arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(
+    mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    median_ratio = median(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    arrest_per_year = sum(arrest) / n_years[as.character(period[1])],
+    crime_per_year = sum(crime) / n_years[as.character(period[1])],
+    n_tracts = sum(is.finite(arrest_crime_ratio)),
+    n_dropped = sum(!is.finite(arrest_crime_ratio))
+  ) |>
+  tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
+  tidyr::pivot_wider(names_from = period, values_from = value) |>
+  dplyr::mutate(dplyr::across(
+    c(pre, post),
+    ~ dplyr::if_else(
+      Statistic %in% c("mean_ratio", "median_ratio"),
+      sprintf("%.3f", .x),
+      sprintf("%.0f", .x)
+    )
+  )) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r}
+#| label: fig-period-comparison
+#| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
+
+ggplot(
+  arrest_over_crime |>
+    dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
+  aes(x = period, y = arrest_crime_ratio)
+) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
+  scale_x_discrete(
+    labels = c(
+      pre = "PredPol Era\n(2015–2019)",
+      post = "DICFP Era\n(2022–2024)"
+    )
+  ) +
+  labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio",
+    title = "Did Enforcement Intensity Decline\nAfter PredPol Ended?",
+    subtitle = "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era",
+    caption = "Tracts with ratio > 2 excluded for readability (max: 6.7 post, 5.1 pre); see Table 1 for full range."
+  ) +
+  theme_minimal()
+```
+
+The median arrest-to-crime ratio dropped from 0.35 in the PredPol era to 0.25 in the DICFP era, and the mean dropped from 0.42 to 0.31. Both crime and arrests fell in annualized terms too (crime: ~226,875/yr to ~198,883/yr; arrests: ~109,310/yr to ~65,909/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (14 pre, 7 post) had zero recorded crime and were excluded, since the ratio is undefined there.
+
+This is only a citywide baseline; it doesn't yet address whether the decline is uniform across neighborhoods regardless of racial composition, which is the next layer for the full paper. It's also worth noting that the DICFP-era window (2022–2024) still captures lingering pandemic and post-2020 effects on policing that aren't cleanly separable from the DICFP transition itself.
+
+## References
