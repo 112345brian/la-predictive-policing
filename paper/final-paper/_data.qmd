@@ -1,0 +1,18 @@
+(Preliminary code for later)
+
+``` r
+# Estimate dispersion via an initial negative binomial fit.
+nb_fit <- MASS::glm.nb(
+  arrest ~ period * pct_black_latino + offset(log(crime)),
+  data = arrest_over_crime
+)
+
+# Population-averaged negative binomial GEE, clustered by tract.
+geepack::geeglm(
+  arrest ~ period * pct_black_latino + offset(log(crime)),
+  id = GEOID,
+  family = MASS::negative.binomial(nb_fit$theta),
+  corstr = "exchangeable",
+  data = arrest_over_crime
+)
+```

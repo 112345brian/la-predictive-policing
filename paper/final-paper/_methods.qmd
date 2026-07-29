@@ -1,0 +1,24 @@
+This project tests whether LAPD's shift from PredPol to DICFP corresponds to a measurable change in enforcement intensity, and whether any such change is uniform across neighborhoods or concentrated by racial composition. The analysis compares tract-level arrest-to-crime ratios across the PredPol and DICFP eras, then tests whether the size of that change depends on a tract's Black/Latino population share.
+
+Dependent variable: count of arrests per tract-period, modeled as a rate relative to reported crime (see below). Enforcement intensity is the underlying construct. Tracts where arrests exceed what reported crime would predict.
+
+Independent variable: policing-era period. I will study the PredPol era (2015-2019) vs. the DICFP era (2022-2024), with 2020-2021 dropped or included as a dummy to isolate COVID-era confounds from the program change itself.
+
+Unit of analysis: census tract, matched to ACS demographic data, with LAPD division as a fallback if tract-level crime/arrest data proves too sparse.
+
+To test whether the pre/post decline in enforcement intensity is uniform across neighborhoods or concentrated in majority-Black/Latino tracts, period is interacted with tract racial composition. Rather than model the arrest-to-crime ratio directly, arrest counts are modeled as a negative binomial rate with reported crime entered as an offset:
+
+$$\text{Arrests}_{it} \sim \text{NegBinomial}(\mu_{it}, \theta), \quad
+\log(\mu_{it}) = \log(\text{Crime}_{it}) + \beta_0 + \beta_1 \text{Period}_t + \beta_2 \text{PctBlackLatino}_i + \beta_3 (\text{Period}_t \times \text{PctBlackLatino}_i)$$
+
+where $i$ indexes census tract and $t$ indexes era (PredPol vs. DICFP). Fixing the coefficient on $\log(\text{Crime}_{it})$ at 1 (the offset) is what turns this into a model of the arrest *rate* relative to crime rather than of arrest counts in isolation. $\beta_3$ is the coefficient of interest: it tests whether the DICFP-era change in enforcement intensity differs by tract racial composition.
+
+Modeling arrest counts directly, rather than the arrest-to-crime ratio, is the appropriate specification for two reasons: it handles zero-arrest tract-periods natively, and it lets the ratio's precision scale with the underlying crime volume instead of treating every computed ratio as equally informative.
+
+A small but non-trivial share of tract-periods (51 of 2,355, about 2%) have zero arrests. These are valid observations of low enforcement intensity and should not be dropped. A ratio-based approach handles them unevenly. The arrest-to-crime ratio is undefined for tracts with zero reported crime, which is already excluded from the sample; separately, a log transform of the ratio is undefined at zero arrests, which would force dropping or artificially adjusting exactly those tract-periods. Modeling arrest counts directly with a log link and a crime offset, rather than dividing by crime first, keeps zero-arrest tract-periods in the analysis and avoids ever taking a log of zero.
+
+Even where the ratio is well-defined, computing it by hand and feeding it to OLS treats a ratio of 0 from 1 crime and 0 arrests the same as a ratio of 0 from 500 crimes and 0 arrests, even though the latter is far stronger evidence of low enforcement intensity. A count model with a crime offset does not have this problem: the ratio interpretation falls out of the offset, and the model's own variance structure naturally gives more weight to tract-periods with more underlying crime.
+
+Negative binomial, rather than Poisson, is used because arrest counts are heavily overdispersed: the raw variance-to-mean ratio in the data is approximately 1,797, far past the equidispersion that Poisson assumes. This mirrors standard practice in the neighborhood crime-count literature; @semenza-etal_2022_eviction-crime-neighborhood, studying homicide, robbery, and burglary counts across Philadelphia census tracts, likewise treat overdispersion as a given for neighborhood-level crime counts and fit negative binomial models directly rather than starting from Poisson and testing.
+
+Each tract in this design contributes one observation per era, so the two observations from the same tract are not independent. Following the same precedent, the model is estimated as a population-averaged negative binomial GEE (generalized estimating equations) model clustered by tract, rather than a standard GLM with cluster-robust standard errors added afterward. A GEE directly models the within-tract correlation structure across periods rather than treating it as a correction applied after the fact, and, per @semenza-etal_2022_eviction-crime-neighborhood, is more robust to misspecification of that correlation structure than fixed- or random-effects panel alternatives. See Data for the R implementation.
