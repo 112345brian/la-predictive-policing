@@ -1,0 +1,66 @@
+---
+title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
+shorttitle: "First Draft"
+author:
+  - name: Brian Powers
+    corresponding: true
+    affiliations:
+      city: Los Angeles
+      region: CA
+documentmode: stu
+course: "AS.703 Urban Data Analytics"
+professor: "Eric Lindgren"
+duedate: "July 26, 2026"
+bibliography: ../references.bib
+suppress-author-note: true
+floatsintext: true
+toc: true
+format:
+  apaquarto-pdf: default
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(ggplot2)
+here::i_am("paper/first-draft/first-draft.qmd")
+
+m <- readRDS(here::here("data", "processed", "period-comparison.rds"))
+arrest_over_crime <- m$arrest_over_crime
+n_years <- m$n_years
+```
+
+## Introduction
+
+{{< include _introduction.qmd >}}
+
+## Background
+
+{{< include _background.qmd >}}
+
+## Literature Review
+
+{{< include _lit-review.qmd >}}
+
+## Data
+
+{{< include _data.qmd >}}
+
+## Methods
+
+{{< include _methods.qmd >}}
+
+## Results
+
+{{< include _results.qmd >}}
+
+## Discussion
+
+{{< include _discussion.qmd >}}
+
+## Conclusion
+
+{{< include _conclusion.qmd >}}

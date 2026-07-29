@@ -1,0 +1,60 @@
+As a preliminary, unconditional check before fitting the negative binomial model described above, the raw arrest-to-crime ratio is compared citywide across the PredPol and DICFP eras. This descriptive comparison intended only to establish whether enforcement intensity moved at all before testing whether that movement varies by tract. It does not test the racial-composition interaction, the exact question the ratio approach is not suited to answer on its own.
+
+```{r}
+#| label: tbl-period-comparison
+#| tbl-cap: "Arrest-to-crime ratio by era"
+
+arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(
+    mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    median_ratio = median(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    arrest_per_year = sum(arrest) / n_years[as.character(period[1])],
+    crime_per_year = sum(crime) / n_years[as.character(period[1])],
+    n_tracts = sum(is.finite(arrest_crime_ratio)),
+    n_dropped = sum(!is.finite(arrest_crime_ratio))
+  ) |>
+  tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
+  tidyr::pivot_wider(names_from = period, values_from = value) |>
+  dplyr::mutate(dplyr::across(
+    c(pre, post),
+    ~ dplyr::if_else(
+      Statistic %in% c("mean_ratio", "median_ratio"),
+      sprintf("%.3f", .x),
+      sprintf("%.0f", .x)
+    )
+  )) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r}
+#| label: fig-period-comparison
+#| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
+
+ggplot(
+  arrest_over_crime |>
+    dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
+  aes(x = period, y = arrest_crime_ratio)
+) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
+  scale_x_discrete(
+    labels = c(
+      pre = "PredPol Era\n(2015–2019)",
+      post = "DICFP Era\n(2022–2024)"
+    )
+  ) +
+  labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio",
+    title = "Did Enforcement Intensity Decline\nAfter PredPol Ended?",
+    subtitle = "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era",
+    caption = "Tracts with ratio > 2 excluded for readability (max: 6.7 post, 5.1 pre); see Table 1 for full range."
+  ) +
+  theme_minimal()
+```
+
+The median arrest-to-crime ratio dropped from 0.35 in the PredPol era to 0.25 in the DICFP era, and the mean dropped from 0.42 to 0.31. Both crime and arrests fell in annualized terms too (crime: \~226,875/yr to \~198,883/yr; arrests: \~109,310/yr to \~65,909/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (14 pre, 7 post) had zero recorded crime and were excluded, since the ratio is undefined there.
+
+This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods, once fit, is what will actually test whether the size of this decline depends on tract racial composition.

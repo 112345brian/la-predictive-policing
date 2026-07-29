@@ -26,6 +26,8 @@ paper/**/*.blg
 paper/**/*.fdb_latexmk
 paper/**/*.fls
 paper/**/*.synctex.gz
+paper/**/*.fff
+paper/**/*.ttt
 
 # ...but keep vendored Quarto extensions (real source, not build output)
 !paper/**/_extensions/**
