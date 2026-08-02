@@ -1,0 +1,13 @@
+### Limitation: between- Versus within-Effect Variation
+
+- the model only tells us about the distribution of enforcement over the distribution of minority tract neighborhoods
+- imagine if we have a neighborhood with 80% black population in 2014 with high enforcement intensity relative to actual crime. if that same neighborhood experienced demographic change that reduced its proportion of black people to 40%, but the enforcement patterns remained the same, this would tell a different story than a neighborhood that had increased enforcment intensity proper. in the former, this is a story about the intertia of enforcement intensity and procedures; in the latter, this is a story about actively implementing procedures that are consistent with overpolicing.
+- **tie back to our data.**
+- **what we could have done instead.**
+  - mudlak style decomposition
+
+### Limitation: Non-Causal Design
+
+### GEE Diagnostics Unreported
+
+### COVID Confound on The Period Itself
