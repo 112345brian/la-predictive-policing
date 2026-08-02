@@ -20,41 +20,163 @@ arrest_over_crime |>
     c(pre, post),
     ~ dplyr::if_else(
       Statistic %in% c("mean_ratio", "median_ratio"),
-      sprintf("%.3f", .x),
-      sprintf("%.0f", .x)
+      scales::number(.x, accuracy = 0.001),
+      scales::number(.x, accuracy = 1)
     )
   )) |>
   knitr::kable() |>
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
 ```{r}
 #| label: fig-period-comparison
 #| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
 
-ggplot(
+ggplot2::ggplot(
   arrest_over_crime |>
     dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
-  aes(x = period, y = arrest_crime_ratio)
+  ggplot2::aes(x = period, y = arrest_crime_ratio)
 ) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
-  scale_x_discrete(
+  ggplot2::geom_boxplot(outlier.shape = NA) +
+  ggplot2::geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
+  ggplot2::scale_x_discrete(
     labels = c(
       pre = "PredPol Era\n(2015–2019)",
       post = "DICFP Era\n(2022–2024)"
     )
   ) +
-  labs(
+  ggplot2::labs(
     x = NULL,
     y = "Arrest-to-Crime Ratio",
     title = "Did Enforcement Intensity Decline\nAfter PredPol Ended?",
     subtitle = "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era",
     caption = "Tracts with ratio > 2 excluded for readability (max: 6.7 post, 5.1 pre); see Table 1 for full range."
   ) +
-  theme_minimal()
+  ggplot2::theme_minimal()
 ```
 
 The median arrest-to-crime ratio dropped from 0.35 in the PredPol era to 0.25 in the DICFP era, and the mean dropped from 0.42 to 0.31. Both crime and arrests fell in annualized terms too (crime: \~226,875/yr to \~198,883/yr; arrests: \~109,310/yr to \~65,909/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (14 pre, 7 post) had zero recorded crime and were excluded, since the ratio is undefined there.
 
-This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods, once fit, is what will actually test whether the size of this decline depends on tract racial composition.
+This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods tests whether the size of this decline depends on tract racial composition.
+
+```{r}
+#| label: tbl-headline-gee
+#| tbl-cap: "Period x racial composition interaction, negative binomial GEE"
+
+# Drop tracts with zero recorded crime.
+gee_data <- arrest_over_crime |>
+  dplyr::filter(crime > 0, !is.na(pct_black_latino)) |>
+  dplyr::arrange(GEOID) |>
+  as.data.frame()
+
+# Have to calculate dispersion first to use for GEE.
+nb_fit <- MASS::glm.nb(
+  arrest ~ period * pct_black_latino + offset(log(crime)),
+  data = gee_data
+)
+
+gee_fit <- geeM::geem(
+  arrest ~ period * pct_black_latino + offset(log(crime)),
+  id = GEOID,
+  family = MASS::negative.binomial(nb_fit$theta),
+  corstr = "exchangeable",
+  data = gee_data
+)
+
+gee_summary <- summary(gee_fit)
+data.frame(
+  term = gee_summary$coefnames,
+  estimate = gee_summary$beta,
+  robust_se = gee_summary$se.robust,
+  wald = gee_summary$wald.test,
+  p_value = gee_summary$p,
+  IRR = exp(gee_summary$beta)
+) |>
+  knitr::kable(digits = 3) |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+
+```{r}
+#| label: tbl-predicted-rates
+#| tbl-cap: "Predicted Arrest-to-Crime Rate by Era and Racial Composition"
+
+beta <- setNames(gee_summary$beta, gee_summary$coefnames)
+
+scenarios <- data.frame(
+  period = rep(c("pre", "post"), times = 6),
+  pct_black_latino = rep(c(0, .2, .4, .6, .8, 1), each = 2)
+)
+
+predict_rate <- function(scenarios, exponentiate = FALSE){
+  raw_output <- with(scenarios,
+    beta["(Intercept)"] +
+      beta["periodpost"] * (period == "post") +
+      beta["pct_black_latino"] * pct_black_latino +
+      beta["periodpost:pct_black_latino"] * (period == "post") *
+      pct_black_latino
+  )
+  if(exponentiate == TRUE) {
+    exp(raw_output)
+  }
+  else{
+    raw_output
+  }
+}
+
+scenarios$predicted_rate <- predict_rate(scenarios, exponentiate = TRUE)
+
+scenarios |>
+  dplyr::mutate(
+    period = dplyr::recode(period, pre = "PredPol Era (Before)", post = "DICFP Era (After)"),
+    pct_black_latino = scales::percent(pct_black_latino)
+  ) |>
+  dplyr::select(pct_black_latino, period, predicted_rate) |>
+  tidyr::pivot_wider(names_from = period, values_from = predicted_rate) |>
+  dplyr::rename(`Pct. Black/Latino` = pct_black_latino) |>
+  knitr::kable(digits = 3) |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+```{r}
+#| label: fig-marginal-effects
+#| fig-cap: "Predicted Arrest-to-Crime Rate by Racial Composition and Era"
+
+
+pct_by_sequence <- tidyr::expand_grid(
+  period = factor(c("pre", "post"), levels = c("pre", "post")),
+  pct_black_latino = seq(0, 1, by = 0.001)
+)
+
+pct_by_sequence$predicted_rate <- predict_rate(
+  pct_by_sequence, 
+  exponentiate = TRUE)
+
+pct_by_sequence |>
+  ggplot2::ggplot(
+  mapping = ggplot2::aes(x = pct_black_latino, y = predicted_rate, color = period)
+  ) +
+  ggplot2::geom_line() +
+  ggplot2::scale_x_continuous(labels = scales::percent_format()) +
+  ggplot2::annotate(
+    "text", x = 0.55, y = 0.47,
+    label = "PredPol Era (Before)", color = "black", hjust = 0.5
+  ) +
+  ggplot2::annotate(
+    "text", x = 0.55, y = 0.24,
+    label = "DICFP Era (After)", color = "black", hjust = 0.5
+  ) +
+  ggplot2::scale_color_manual(
+    values = c(pre = "#2c3e50", post = "#c98a2c"),
+    guide = "none"
+  ) +
+  ggplot2::labs(
+    x = "black/latino population (%)",
+    y = "predicted ratio of arrests per reported crime"
+  ) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()) +
+  ggplot2::coord_cartesian(clip = "off") +
+  ggplot2::theme(plot.margin = ggplot2::margin(r = 80))
+
+```

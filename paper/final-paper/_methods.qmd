@@ -8,8 +8,13 @@ Unit of analysis: census tract, matched to ACS demographic data, with LAPD divis
 
 To test whether the pre/post decline in enforcement intensity is uniform across neighborhoods or concentrated in majority-Black/Latino tracts, period is interacted with tract racial composition. Rather than model the arrest-to-crime ratio directly, arrest counts are modeled as a negative binomial rate with reported crime entered as an offset:
 
-$$\text{Arrests}_{it} \sim \text{NegBinomial}(\mu_{it}, \theta), \quad
-\log(\mu_{it}) = \log(\text{Crime}_{it}) + \beta_0 + \beta_1 \text{Period}_t + \beta_2 \text{PctBlackLatino}_i + \beta_3 (\text{Period}_t \times \text{PctBlackLatino}_i)$$
+$$
+\begin{aligned}
+\text{Arrests}_{it} &\sim \text{NegBinomial}(\mu_{it}, \theta) \\
+\log(\mu_{it}) &= \log(\text{Crime}_{it}) + \beta_0 + \beta_1 \text{Period}_t \\
+&\quad + \beta_2 \text{PctBlackLatino}_i + \beta_3 (\text{Period}_t \times \text{PctBlackLatino}_i)
+\end{aligned}
+$$
 
 where $i$ indexes census tract and $t$ indexes era (PredPol vs. DICFP). Fixing the coefficient on $\log(\text{Crime}_{it})$ at 1 (the offset) is what turns this into a model of the arrest *rate* relative to crime rather than of arrest counts in isolation. $\beta_3$ is the coefficient of interest: it tests whether the DICFP-era change in enforcement intensity differs by tract racial composition.
 
