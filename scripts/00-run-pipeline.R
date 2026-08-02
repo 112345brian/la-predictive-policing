@@ -10,5 +10,6 @@ source(here::here("scripts", "04-build-neighborhoods.R"))
 source(here::here("scripts", "05-build-spatial.R"))
 source(here::here("scripts", "06-prep-dashboard.R"))
 source(here::here("scripts", "07-prep-period-comparison.R"))
+source(here::here("scripts", "08-join-demographics.R"))
 
 # See the private directory for Markup/motivation scripts
