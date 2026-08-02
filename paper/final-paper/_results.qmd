@@ -4,7 +4,7 @@ As a preliminary, unconditional check before fitting the negative binomial model
 #| label: tbl-period-comparison
 #| tbl-cap: "Arrest-to-crime ratio by era"
 
-arrest_over_crime |>
+period_comparison_stats <- arrest_over_crime |>
   dplyr::group_by(period) |>
   dplyr::summarise(
     mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
@@ -13,7 +13,9 @@ arrest_over_crime |>
     crime_per_year = sum(crime) / n_years[as.character(period[1])],
     n_tracts = sum(is.finite(arrest_crime_ratio)),
     n_dropped = sum(!is.finite(arrest_crime_ratio))
-  ) |>
+  )
+
+period_comparison_stats |>
   tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
   tidyr::pivot_wider(names_from = period, values_from = value) |>
   dplyr::mutate(dplyr::across(
@@ -26,6 +28,25 @@ arrest_over_crime |>
   )) |>
   knitr::kable() |>
   kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+```{r}
+#| label: period-comparison-narrative-values
+#| include: false
+
+pc_pre <- period_comparison_stats |> dplyr::filter(period == "pre")
+pc_post <- period_comparison_stats |> dplyr::filter(period == "post")
+
+median_ratio_pre <- scales::number(pc_pre$median_ratio, accuracy = 0.01)
+median_ratio_post <- scales::number(pc_post$median_ratio, accuracy = 0.01)
+mean_ratio_pre <- scales::number(pc_pre$mean_ratio, accuracy = 0.01)
+mean_ratio_post <- scales::number(pc_post$mean_ratio, accuracy = 0.01)
+crime_per_year_pre <- scales::number(pc_pre$crime_per_year, accuracy = 1, big.mark = ",")
+crime_per_year_post <- scales::number(pc_post$crime_per_year, accuracy = 1, big.mark = ",")
+arrest_per_year_pre <- scales::number(pc_pre$arrest_per_year, accuracy = 1, big.mark = ",")
+arrest_per_year_post <- scales::number(pc_post$arrest_per_year, accuracy = 1, big.mark = ",")
+n_dropped_pre <- pc_pre$n_dropped
+n_dropped_post <- pc_post$n_dropped
 ```
 
 ```{r}
@@ -55,7 +76,7 @@ ggplot2::ggplot(
   ggplot2::theme_minimal()
 ```
 
-The median arrest-to-crime ratio dropped from 0.35 in the PredPol era to 0.25 in the DICFP era, and the mean dropped from 0.42 to 0.31. Both crime and arrests fell in annualized terms too (crime: \~226,875/yr to \~198,883/yr; arrests: \~109,310/yr to \~65,909/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (14 pre, 7 post) had zero recorded crime and were excluded, since the ratio is undefined there.
+The median arrest-to-crime ratio dropped from `r median_ratio_pre` in the PredPol era to `r median_ratio_post` in the DICFP era, and the mean dropped from `r mean_ratio_pre` to `r mean_ratio_post`. Both crime and arrests fell in annualized terms too (crime: \~`r crime_per_year_pre`/yr to \~`r crime_per_year_post`/yr; arrests: \~`r arrest_per_year_pre`/yr to \~`r arrest_per_year_post`/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (`r n_dropped_pre` pre, `r n_dropped_post` post) had zero recorded crime and were excluded, since the ratio is undefined there.
 
 This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods tests whether the size of this decline depends on tract racial composition.
 

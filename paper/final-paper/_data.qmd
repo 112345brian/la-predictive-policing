@@ -25,6 +25,20 @@ descriptive_stats |>
 ```
 
 ```{r}
+#| label: methods-narrative-values
+#| include: false
+
+n_tract_periods_raw <- nrow(arrest_over_crime)
+n_zero_arrest <- sum(arrest_over_crime$arrest == 0)
+n_tract_periods <- scales::number(n_tract_periods_raw, big.mark = ",")
+pct_zero_arrest <- scales::percent(n_zero_arrest / n_tract_periods_raw, accuracy = 1)
+dispersion_ratio <- scales::number(
+  var(arrest_over_crime$arrest) / mean(arrest_over_crime$arrest),
+  accuracy = 1, big.mark = ","
+)
+```
+
+```{r}
 #| label: fig-yearly-arrests
 #| fig-cap: "Citywide arrests by year"
 
