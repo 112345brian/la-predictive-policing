@@ -1,18 +1,66 @@
-(Preliminary code for later)
+```{r}
+#| label: descriptives
 
-``` r
-# Estimate dispersion via an initial negative binomial fit.
-nb_fit <- MASS::glm.nb(
-  arrest ~ period * pct_black_latino + offset(log(crime)),
-  data = arrest_over_crime
-)
+descriptive_stats <- arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarize(
+    mean_arrests = mean(arrest) / n_years[as.character(period[1])],
+    n_arrests = sum(arrest) / n_years[as.character(period[1])],
+    mean_pct_black_latino_pop = mean(pct_black_latino, na.rm = TRUE),
+  )
 
-# Population-averaged negative binomial GEE, clustered by tract.
-geepack::geeglm(
-  arrest ~ period * pct_black_latino + offset(log(crime)),
-  id = GEOID,
-  family = MASS::negative.binomial(nb_fit$theta),
-  corstr = "exchangeable",
-  data = arrest_over_crime
-)
+descriptive_stats |>
+  tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
+  tidyr::pivot_wider(names_from = period, values_from = value) |>
+  dplyr::mutate(dplyr::across(
+    c(pre, post),
+    ~ dplyr::if_else(
+      Statistic == "mean_pct_black_latino_pop",
+      scales::number(.x, accuracy = 0.001),
+      scales::number(.x, accuracy = 1)
+    )
+  )) |>
+  knitr::kable()
+
+```
+
+```{r}
+#| label: fig-yearly-arrests
+#| fig-cap: "Citywide arrests by year"
+
+yearly_arrests_raw <- readRDS(here::here("data", "processed", "lapd-spatial.rds")) |>
+  sf::st_drop_geometry() |>
+  dplyr::mutate(incident_date = dplyr::coalesce(date_occ, arst_date)) |>
+  dplyr::filter(type == "arrest", !is.na(incident_date)) |>
+  dplyr::mutate(
+    year = as.integer(format(incident_date, "%Y")),
+    period = factor(period, levels = c("pre", "post"))
+  ) |>
+  dplyr::count(year, period, name = "arrests")
+
+all_years <- seq(min(yearly_arrests_raw$year), max(yearly_arrests_raw$year))
+
+yearly_arrests <- tidyr::expand_grid(year = all_years) |>
+  dplyr::left_join(yearly_arrests_raw, by = "year") |>
+  dplyr::mutate(
+    arrests = tidyr::replace_na(arrests, 0),
+    period = forcats::fct_na_value_to_level(period, "no data")
+  )
+
+ggplot2::ggplot(
+  yearly_arrests,
+  ggplot2::aes(x = year, y = arrests, fill = period)
+) +
+  ggplot2::geom_col() +
+  ggplot2::scale_x_continuous(breaks = all_years) +
+  ggplot2::scale_fill_manual(
+    values = c(pre = "#2c3e50", post = "#c98a2c", `no data` = "grey85"),
+    labels = c(pre = "PredPol Era", post = "DICFP Era", `no data` = "No Data"),
+    name = NULL
+  ) +
+  ggplot2::labs(
+    x = NULL,
+    y = "Arrests"
+  ) +
+  ggplot2::theme_minimal()
 ```
