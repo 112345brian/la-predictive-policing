@@ -20,6 +20,19 @@
 \usepackage{booktabs, multirow, multicol, colortbl, hhline, caption, array, float, xpatch}
 \usepackage{subcaption}
 
+\makeatletter
+% Patch booktabs' longtable-specific rule handler (\@BLTrule) to stop
+% parsing an optional trim argument like \midrule(rl). That parser works
+% by peeking at the very next character after the rule command; if a
+% table's first cell begins with a literal "(" (e.g. the term name
+% "(Intercept)" that model summaries commonly produce), it gets misread
+% as the start of a trim spec and corrupts the table, crashing the build.
+% None of this project's tables use the trim-argument feature, so it's
+% safe to disable it entirely rather than require every table to guard
+% against it. Traced and reported: https://github.com/wjschne/apaquarto/issues/164
+\def\@BLTrule{\@@BLTrule()}
+\makeatother
+
 
 \renewcommand\thesubfigure{\Alph{subfigure}}
 \setcounter{topnumber}{2}
