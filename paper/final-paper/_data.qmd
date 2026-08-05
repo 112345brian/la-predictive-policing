@@ -9,18 +9,27 @@ descriptive_stats <- arrest_over_crime |>
     mean_pct_black_latino_pop = mean(pct_black_latino, na.rm = TRUE),
   )
 
-  tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
-  tidyr::pivot_wider(names_from = period, values_from = value) |>
-  dplyr::mutate(dplyr::across(
-    c(pre, post),
-    ~ dplyr::if_else(
-      Statistic == "mean_pct_black_latino_pop",
-      scales::number(.x, accuracy = 0.001),
-      scales::number(.x, accuracy = 1)
-    )
-  )) |>
-  knitr::kable()
+descriptive_stats_spec <- tibble::tribble(
+  ~stat,                        ~label,                              ~accuracy, ~percent,
+  "mean_arrests",                "Mean Arrests / Year",               1,         FALSE,
+  "n_arrests",                   "N Arrests / Year",                  1,         FALSE,
   "mean_pct_black_latino_pop",   "Mean Black/Latino Population (%)",  0.1,       TRUE
+)
+
+descriptives <- stat_table(descriptive_stats, descriptive_stats_spec)
+
+descriptives$table |>
+  dplyr::rename(`PredPol Era (Before)` = pre, `DICFP Era (After)` = post) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position")) |>
+  kableExtra::footnote(
+    general = paste0(
+      "PredPol era spans ", n_years["pre"], " years (", era_span["pre"], "); ",
+      "DICFP era spans ", n_years["post"], " years (", era_span["post"], "). ",
+      "Per-year figures are annualized totals divided by these spans."
+    ),
+    general_title = "Note.",
+    footnote_as_chunk = TRUE
   )
 
 ```
