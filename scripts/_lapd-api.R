@@ -43,7 +43,7 @@ fetch_lapd_window <- function(
         paste0("window-", cache_name, "-post.rds")
       )
     ) |>
-      dplyr::mutate(!!date_field := as.POSIXct(.data[[date_field]]))
+      dplyr::mutate(!!date_field := as.POSIXct(.data[[date_field]], tz = LAPD_TZ))
   })
 }
 
@@ -56,15 +56,15 @@ fetch_lapd_periods <- function(
 ) {
   pre_where <- paste0(
     date_field,
-    " >= '2015-01-01T00:00:00' AND ",
+    " >= '", PREDPOL_START, "T00:00:00' AND ",
     date_field,
-    " < '2020-01-01T00:00:00'"
+    " < '", PREDPOL_END, "T00:00:00'"
   )
   post_where <- paste0(
     date_field,
-    " >= '2022-01-01T00:00:00' AND ",
+    " >= '", DICFP_START, "T00:00:00' AND ",
     date_field,
-    " < '2025-01-01T00:00:00'"
+    " < '", DICFP_END, "T00:00:00'"
   )
 
   pre <- fetch_lapd_dataset(pre_id, pre_where, pre_cache)
@@ -72,6 +72,6 @@ fetch_lapd_periods <- function(
 
   bind_periods(pre, post) |>
     dplyr::mutate(
-      !!date_field := as.POSIXct(.data[[date_field]])
+      !!date_field := as.POSIXct(.data[[date_field]], tz = LAPD_TZ)
     )
 }
