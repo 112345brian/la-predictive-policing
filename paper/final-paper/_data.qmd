@@ -46,6 +46,20 @@ dispersion_ratio <- scales::number(
   var(arrest_over_crime$arrest) / mean(arrest_over_crime$arrest),
   accuracy = 1, big.mark = ","
 )
+
+pct_nibrs_overlap <- scales::percent(
+  crime_backfill$n_overlap_removed / crime_backfill$n_legacy_post_migration,
+  accuracy = 0.1
+)
+
+count_2024 <- function(name) {
+  scales::number(crime_backfill[[name]], big.mark = ",")
+}
+
+pct_2024_understated <- scales::percent(
+  1 - crime_backfill$total_2024_legacy_only / crime_backfill$total_2024,
+  accuracy = 1
+)
 ```
 
 ```{r}
