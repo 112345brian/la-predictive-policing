@@ -28,9 +28,16 @@ execute:
 library(ggplot2)
 here::i_am("paper/final-paper/final-paper.qmd")
 
+source(here::here("scripts", "_pipeline-helpers.R"))
+source(here::here("paper", "final-paper", "_helpers.R"))
+
 m <- readRDS(here::here("data", "processed", "period-comparison.rds"))
 arrest_over_crime <- m$arrest_over_crime
+arrest_over_crime_all_years <- m$arrest_over_crime_all_years
 n_years <- m$n_years
+
+yearly_counts <- readRDS(here::here("data", "processed", "yearly-counts.rds"))
+crime_backfill <- readRDS(here::here("data", "processed", "crime-backfill-stats.rds"))
 ```
 
 ## Introduction
