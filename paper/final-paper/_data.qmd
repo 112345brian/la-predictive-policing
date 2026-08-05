@@ -38,12 +38,18 @@ descriptives$table |>
 #| label: methods-narrative-values
 #| include: false
 
-n_tract_periods_raw <- nrow(arrest_over_crime)
-n_zero_arrest <- sum(arrest_over_crime$arrest == 0)
+modeled <- analysis_sample(arrest_over_crime)
+
+n_dropped_zero_crime <- sum(arrest_over_crime$crime == 0)
+n_dropped_no_demographics <- sum(
+  arrest_over_crime$crime > 0 & is.na(arrest_over_crime$pct_black_latino)
+)
+n_tract_periods_raw <- nrow(modeled)
+n_zero_arrest <- sum(modeled$arrest == 0)
 n_tract_periods <- scales::number(n_tract_periods_raw, big.mark = ",")
 pct_zero_arrest <- scales::percent(n_zero_arrest / n_tract_periods_raw, accuracy = 1)
 dispersion_ratio <- scales::number(
-  var(arrest_over_crime$arrest) / mean(arrest_over_crime$arrest),
+  var(modeled$arrest) / mean(modeled$arrest),
   accuracy = 1, big.mark = ","
 )
 
@@ -62,43 +68,207 @@ pct_2024_understated <- scales::percent(
 )
 ```
 
+2024 crime figures combine two LAPD datasets. The department migrated to a NIBRS-compliant records system division by division between March and May 2024 [@los-angeles-police-department_2024_lapd-transitions-new], so for the remainder of the year each incident was recorded in whichever system its division had adopted at the time. Neither the legacy "Crime Data from 2020 to Present" dataset nor the newer NIBRS Offenses dataset covers the full year on its own; 2024 counts here are the union of the two. Two features of the data support this. Division-level monthly totals hold steady across the migration even as the legacy share falls and the NIBRS share rises in step, and summed citywide months for the rest of 2024 (`r count_2024("post_migration_month_min")`–`r count_2024("post_migration_month_max")`) match January and February (`r count_2024("jan_2024")` and `r count_2024("feb_2024")`), which predate the migration entirely. Because NIBRS records one row per offense rather than per incident, it is first reduced to one row per case; the two systems share no incident identifier, so the overlap between them (`r pct_nibrs_overlap` of post-migration records) is removed on date, time, location, and division instead. Time of occurrence is necessary to that match rather than incidental to it. Without it, 16% of post-migration legacy records share a date, location, and division with a different report number, and re-matching the two systems against each other with the dates shifted by a week or more, so that every surviving match is coincidental by construction, attributes about three quarters of the removals to chance. Those false matches concentrate at high-volume locations: a third of NIBRS records at points carrying fifty or more legacy incidents, against 0.9% at points carrying one. Matching without time would therefore have suppressed 2024 crime counts most in the densest tracts, which is where this analysis measures enforcement intensity. Treating the legacy dataset as the sole source for 2024 would understate that year's crime by `r pct_2024_understated`. Arrest data required no equivalent correction. LAPD published no NIBRS arrest dataset, and its legacy arrest file continued to receive records through April 2025, more than a year past the migration, so arrests were never split across two systems. Each of the department's 21 divisions reports steady monthly arrest counts across all of 2024, with none of the post-March attrition visible in the crime data, and no arrest report identifier repeats. The structure of an arrest record is also stable across the migration: the mix of bookings to citations shifts only from 76/24 to 71/29 percent and the count of distinct charge codes falls slightly rather than rising, which is the opposite of what a move to finer-grained NIBRS charge recording would produce.
+
+Two problems in the PredPol-era crime data required attention. The first is a duplication error. As published, 2016 carries 283,798 crime records against 225,989 distinct report numbers: 57,809 reports appear exactly twice, identical across every column. This is the sole source of the apparent 2016 spike in citywide crime, and deduplicating on the report number brings 2016 into line with adjacent years. The error is specific to that year. No other year in either crime dataset contains a repeated report number, checked across the full published series from 2010 through 2025, and the arrest datasets contain none in any year.
+
+The duplication matters more for a tract-level analysis than its citywide magnitude suggests, because it is concentrated rather than spread evenly. In five of LAPD's 21 divisions, effectively every 2016 record is duplicated: Topanga, Mission, Olympic, and Southeast at above 99.9%, and Devonshire at 81%. In the remaining sixteen divisions the rate is 5% to 10%. Recorded 2016 crime is therefore roughly doubled in those five areas and close to correct elsewhere, which halves the apparent arrest-to-crime ratio in the affected tracts. The affected divisions span a wide range of racial composition, from 37% to 97% Black/Latino, so the distortion is not aligned with the composition gradient this analysis tests (correlation of 0.10 between a division's duplication rate and its Black/Latino share), but it is large enough to shift tract-level estimates. All crime counts reported here are deduplicated.
+
+The second problem is that 2015 is missing whole divisions, and it is the reason that year is excluded from the analysis. Topanga has no 2015 crime records at all, Mission has one, and Olympic has three, against roughly 10,800 to 11,100 each in adjacent years; Southeast has 871 against roughly 11,500. Arrest records for those same four divisions are complete that year. Because the analysis sums each era, tracts in those divisions would otherwise be credited with five years of arrests against four years of crime, inflating their PredPol-era enforcement intensity by roughly 25%. The four divisions average well above the citywide Black and Latino population share, so the distortion falls directly on the gradient this analysis is designed to measure. The year is therefore dropped from both crime and arrests, leaving a 2016-2019 PredPol era against the 2022-2024 DICFP era, and Results reports what retaining it would do to the estimate.
+
+These four divisions are also the four whose 2016 records are duplicated most completely, which suggests a single failed data load that skipped 2015 and wrote 2016 twice rather than two unrelated errors. The correspondence is close but not exact: Devonshire has complete 2015 records and 81% of its 2016 records duplicated, so whatever produced the two faults did not affect precisely the same set of divisions. Neither problem is documented by LAPD, but the dataset's public comments record the same class of defect in other years: a criminologist reported in 2021 that one division showed a single crime for all of 2012, and in 2023 that two divisions were missing or near-empty for 2014 [@ridgeway_2023_dataset-comment]. Those reports remain unanswered on the portal. Division-year gaps therefore appear to be a recurring property of this dataset rather than an isolated fault, and the arrest data shows no comparable problem: no division-year between 2010 and 2024 falls below half of its adjacent-year average.
+
 ```{r}
-#| label: fig-yearly-arrests
-#| fig-cap: "Citywide arrests by year"
+#| label: fig-yearly-counts
+#| fig-cap: "Citywide crime and arrests by year. Crime counts are deduplicated. The 2015 crime figure is shown as published and is understated, since four divisions are missing from that year; 2015 is excluded from the analysis for that reason."
+#| fig-width: 10
+#| fig-height: 7
 
-yearly_arrests_raw <- readRDS(here::here("data", "processed", "lapd-spatial.rds")) |>
-  sf::st_drop_geometry() |>
-  dplyr::mutate(incident_date = dplyr::coalesce(date_occ, arst_date)) |>
-  dplyr::filter(type == "arrest", !is.na(incident_date)) |>
-  dplyr::mutate(
-    year = as.integer(format(incident_date, "%Y")),
-    period = factor(period, levels = c("pre", "post"))
-  ) |>
-  dplyr::count(year, period, name = "arrests")
+type_labels <- c(arrest = "Arrests", crime = "Crime")
 
-all_years <- seq(min(yearly_arrests_raw$year), max(yearly_arrests_raw$year))
+era_labels <- yearly_counts |>
+  dplyr::group_by(type, period) |>
+  dplyr::summarise(x = mean(year), y = max(n) * 1.04, .groups = "drop") |>
+  dplyr::mutate(label = era_text_labels[as.character(period)])
 
-yearly_arrests <- tidyr::expand_grid(year = all_years) |>
-  dplyr::left_join(yearly_arrests_raw, by = "year") |>
-  dplyr::mutate(
-    arrests = tidyr::replace_na(arrests, 0),
-    period = forcats::fct_na_value_to_level(period, "no data")
-  )
+# One continuous line,
+# since it's the same measure across years, transition points included.
+# Each segment is colored by its starting point's era,
+# since geom_line's default per-group behavior
+# would otherwise break the line at era boundaries.
+yearly_segments <- yearly_counts |>
+  dplyr::arrange(type, year) |>
+  dplyr::group_by(type) |>
+  dplyr::mutate(xend = dplyr::lead(year), yend = dplyr::lead(n)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(!is.na(xend))
 
 ggplot2::ggplot(
-  yearly_arrests,
-  ggplot2::aes(x = year, y = arrests, fill = period)
+  yearly_counts,
+  ggplot2::aes(x = year, y = n, color = period)
 ) +
-  ggplot2::geom_col() +
-  ggplot2::scale_x_continuous(breaks = all_years) +
-  ggplot2::scale_fill_manual(
-    values = c(pre = "#2c3e50", post = "#c98a2c", `no data` = "grey85"),
-    labels = c(pre = "PredPol Era", post = "DICFP Era", `no data` = "No Data"),
-    name = NULL
+  ggplot2::geom_segment(
+    data = yearly_segments,
+    mapping = ggplot2::aes(xend = xend, yend = yend),
+    linewidth = 1
   ) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::geom_text(
+    data = era_labels,
+    mapping = ggplot2::aes(x = x, y = y, label = label, color = period),
+    inherit.aes = FALSE,
+    fontface = "bold",
+    # Anchor the bottom of the text, so multi-line labels
+    # grow upward away from the line rather than across it.
+    vjust = 0,
+    lineheight = 0.9
+  ) +
+  ggplot2::facet_wrap(
+    ~type, ncol = 1, scales = "free_y",
+    labeller = ggplot2::as_labeller(type_labels)
+  ) +
+  ggplot2::scale_x_continuous(breaks = sort(unique(yearly_counts$year))) +
+  ggplot2::scale_y_continuous(
+    labels = scales::label_comma(),
+    expand = ggplot2::expansion(mult = c(0, 0.15))
+  ) +
+  ggplot2::scale_color_manual(values = era_colors, guide = "none") +
   ggplot2::labs(
     x = NULL,
-    y = "Arrests"
+    y = "Count"
   ) +
   ggplot2::theme_minimal()
 ```
+
+As a preliminary, unconditional check before fitting the negative binomial model described in Methods, the raw arrest-to-crime ratio is compared citywide across the PredPol and DICFP eras. This comparison intended only to establish whether enforcement intensity moved at all before testing whether that movement varies by tract. It does not test the racial-composition interaction, the exact question the ratio approach is not suited to answer on its own.
+
+```{r}
+#| label: period-comparison-values
+#| include: false
+
+period_comparison_stats <- arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(
+    mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    median_ratio = median(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    arrest_per_year = sum(arrest) / n_years[as.character(period[1])],
+    crime_per_year = sum(crime) / n_years[as.character(period[1])],
+    n_tracts = sum(is.finite(arrest_crime_ratio)),
+    n_dropped = sum(!is.finite(arrest_crime_ratio))
+  )
+
+period_comparison_spec <- tibble::tribble(
+  ~stat,              ~label,           ~accuracy,
+  "mean_ratio",        "Mean Ratio",     0.001,
+  "median_ratio",      "Median Ratio",   0.001,
+  "arrest_per_year",   "Arrests / Year", 1,
+  "crime_per_year",    "Crimes / Year",  1,
+  "n_tracts",          "N Tracts",       1,
+  "n_dropped",         "N Dropped",      1
+)
+
+period_comparison <- stat_table(period_comparison_stats, period_comparison_spec)
+display <- period_comparison$display
+```
+
+```{r}
+#| label: tbl-period-comparison
+#| tbl-cap: "Arrest-to-crime ratio by era"
+
+period_comparison$table |>
+  dplyr::rename(`PredPol Era (Before)` = pre, `DICFP Era (After)` = post) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position")) |>
+  kableExtra::footnote(
+    general = paste0(
+      "PredPol era spans ", n_years["pre"], " years (", era_span["pre"], "); ",
+      "DICFP era spans ", n_years["post"], " years (", era_span["post"], "). ",
+      "Per-year figures are annualized totals divided by these spans."
+    ),
+    general_title = "Note.",
+    footnote_as_chunk = TRUE
+  )
+```
+
+```{r}
+#| label: fig-period-comparison
+#| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
+
+max_ratio_by_period <- arrest_over_crime |>
+  dplyr::filter(is.finite(arrest_crime_ratio)) |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(max_ratio = max(arrest_crime_ratio))
+
+max_ratio_pre <- scales::number(max_ratio_by_period$max_ratio[max_ratio_by_period$period == "pre"], accuracy = 0.1)
+max_ratio_post <- scales::number(max_ratio_by_period$max_ratio[max_ratio_by_period$period == "post"], accuracy = 0.1)
+
+ggplot2::ggplot(
+  arrest_over_crime |>
+    dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
+  ggplot2::aes(x = period, y = arrest_crime_ratio)
+) +
+  ggplot2::geom_boxplot(outlier.shape = NA) +
+  ggplot2::geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
+  ggplot2::scale_x_discrete(
+    labels = c(
+      pre = paste0("PredPol Era\n(", era_span["pre"], ")"),
+      post = paste0("DICFP Era\n(", era_span["post"], ")")
+    )
+  ) +
+  ggplot2::labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio",
+    caption = paste0(
+      "Tracts with ratio > 2 excluded for readability (max: ",
+      max_ratio_post, " post, ", max_ratio_pre, " pre); see Table 1 for full range."
+    )
+  ) +
+  ggplot2::theme_minimal()
+```
+
+```{r}
+#| label: fig-yearly-ratio
+#| fig-cap: "Citywide arrest-to-crime ratio by year"
+#| fig-width: 10
+#| fig-height: 5
+
+yearly_ratio <- yearly_counts |>
+  tidyr::pivot_wider(names_from = type, values_from = n) |>
+  dplyr::mutate(ratio = arrest / crime)
+
+ratio_era_labels <- yearly_ratio |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(x = mean(year), y = max(ratio) * 1.08, .groups = "drop") |>
+  dplyr::mutate(label = era_text_labels[as.character(period)])
+
+ratio_segments <- yearly_ratio |>
+  dplyr::arrange(year) |>
+  dplyr::mutate(xend = dplyr::lead(year), yend = dplyr::lead(ratio)) |>
+  dplyr::filter(!is.na(xend))
+
+ggplot2::ggplot(yearly_ratio, ggplot2::aes(x = year, y = ratio, color = period)) +
+  ggplot2::geom_segment(
+    data = ratio_segments,
+    mapping = ggplot2::aes(xend = xend, yend = yend),
+    linewidth = 1
+  ) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::geom_text(
+    data = ratio_era_labels,
+    mapping = ggplot2::aes(x = x, y = y, label = label, color = period),
+    inherit.aes = FALSE,
+    fontface = "bold"
+  ) +
+  ggplot2::scale_x_continuous(breaks = sort(unique(yearly_ratio$year))) +
+  ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.15))) +
+  ggplot2::scale_color_manual(values = era_colors, guide = "none") +
+  ggplot2::labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio"
+  ) +
+  ggplot2::theme_minimal()
+```
+
+The median arrest-to-crime ratio dropped from `r display$median_ratio_pre` in the PredPol era to `r display$median_ratio_post` in the DICFP era, and the mean dropped from `r display$mean_ratio_pre` to `r display$mean_ratio_post`. The decline is driven by arrests alone. Annualized reported crime is modestly higher in the DICFP era (\~`r display$crime_per_year_pre`/yr to \~`r display$crime_per_year_post`/yr), while annualized arrests fall by roughly 40% (\~`r display$arrest_per_year_pre`/yr to \~`r display$arrest_per_year_post`/yr). Enforcement intensity therefore declined while reported crime was flat to rising, rather than tracking any drop in crime itself. A small number of tracts (`r display$n_dropped_pre` pre, `r display$n_dropped_post` post) had zero recorded crime and were excluded, since the ratio is undefined there.
+
+This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods tests whether the size of this decline depends on tract racial composition.
