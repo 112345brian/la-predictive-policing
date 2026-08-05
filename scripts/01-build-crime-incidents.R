@@ -14,4 +14,13 @@ lapd_crimes <- fetch_lapd_periods(
   "lapd-crimes-post-raw.rds"
 )
 
+# 2016 ships 57,809 records twice, identical across every column.
+# This is the source of the apparent 2016 spike.
+# I whole-row dedup rather than dr_no.
+# A refresh with genuinely differing same-dr_no rows trips the guard below
+# instead of silently keeping whichever the API returned first.
+
+lapd_crimes <- dplyr::distinct(lapd_crimes)
+stopifnot(!anyDuplicated(lapd_crimes$dr_no))
+
 write_processed_dataset(lapd_crimes, "lapd-crimes.rds")
