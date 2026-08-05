@@ -9,7 +9,6 @@ descriptive_stats <- arrest_over_crime |>
     mean_pct_black_latino_pop = mean(pct_black_latino, na.rm = TRUE),
   )
 
-descriptive_stats |>
   tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
   tidyr::pivot_wider(names_from = period, values_from = value) |>
   dplyr::mutate(dplyr::across(
@@ -22,6 +21,7 @@ descriptive_stats |>
   )) |>
   knitr::kable()
   "mean_pct_black_latino_pop",   "Mean Black/Latino Population (%)",  0.1,       TRUE
+  )
 
 ```
 
