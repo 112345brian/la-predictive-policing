@@ -1,110 +1,18 @@
-As a preliminary, unconditional check before fitting the negative binomial model described above, the raw arrest-to-crime ratio is compared citywide across the PredPol and DICFP eras. This descriptive comparison intended only to establish whether enforcement intensity moved at all before testing whether that movement varies by tract. It does not test the racial-composition interaction, the exact question the ratio approach is not suited to answer on its own.
-
-```{r}
-#| label: tbl-period-comparison
-#| tbl-cap: "Arrest-to-crime ratio by era"
-
-period_comparison_stats <- arrest_over_crime |>
-  dplyr::group_by(period) |>
-  dplyr::summarise(
-    mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
-    median_ratio = median(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
-    arrest_per_year = sum(arrest) / n_years[as.character(period[1])],
-    crime_per_year = sum(crime) / n_years[as.character(period[1])],
-    n_tracts = sum(is.finite(arrest_crime_ratio)),
-    n_dropped = sum(!is.finite(arrest_crime_ratio))
-  )
-
-period_comparison_stats |>
-  tidyr::pivot_longer(-period, names_to = "Statistic", values_to = "value") |>
-  tidyr::pivot_wider(names_from = period, values_from = value) |>
-  dplyr::mutate(dplyr::across(
-    c(pre, post),
-    ~ dplyr::if_else(
-      Statistic %in% c("mean_ratio", "median_ratio"),
-      scales::number(.x, accuracy = 0.001),
-      scales::number(.x, accuracy = 1)
-    )
-  )) |>
-  knitr::kable() |>
-  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
-```
-
-```{r}
-#| label: period-comparison-narrative-values
-#| include: false
-
-pc_pre <- period_comparison_stats |> dplyr::filter(period == "pre")
-pc_post <- period_comparison_stats |> dplyr::filter(period == "post")
-
-median_ratio_pre <- scales::number(pc_pre$median_ratio, accuracy = 0.01)
-median_ratio_post <- scales::number(pc_post$median_ratio, accuracy = 0.01)
-mean_ratio_pre <- scales::number(pc_pre$mean_ratio, accuracy = 0.01)
-mean_ratio_post <- scales::number(pc_post$mean_ratio, accuracy = 0.01)
-crime_per_year_pre <- scales::number(pc_pre$crime_per_year, accuracy = 1, big.mark = ",")
-crime_per_year_post <- scales::number(pc_post$crime_per_year, accuracy = 1, big.mark = ",")
-arrest_per_year_pre <- scales::number(pc_pre$arrest_per_year, accuracy = 1, big.mark = ",")
-arrest_per_year_post <- scales::number(pc_post$arrest_per_year, accuracy = 1, big.mark = ",")
-n_dropped_pre <- pc_pre$n_dropped
-n_dropped_post <- pc_post$n_dropped
-```
-
-```{r}
-#| label: fig-period-comparison
-#| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
-
-ggplot2::ggplot(
-  arrest_over_crime |>
-    dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
-  ggplot2::aes(x = period, y = arrest_crime_ratio)
-) +
-  ggplot2::geom_boxplot(outlier.shape = NA) +
-  ggplot2::geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
-  ggplot2::scale_x_discrete(
-    labels = c(
-      pre = "PredPol Era\n(2015–2019)",
-      post = "DICFP Era\n(2022–2024)"
-    )
-  ) +
-  ggplot2::labs(
-    x = NULL,
-    y = "Arrest-to-Crime Ratio",
-    title = "Did Enforcement Intensity Decline\nAfter PredPol Ended?",
-    subtitle = "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era",
-    caption = "Tracts with ratio > 2 excluded for readability (max: 6.7 post, 5.1 pre); see Table 1 for full range."
-  ) +
-  ggplot2::theme_minimal()
-```
-
-The median arrest-to-crime ratio dropped from `r median_ratio_pre` in the PredPol era to `r median_ratio_post` in the DICFP era, and the mean dropped from `r mean_ratio_pre` to `r mean_ratio_post`. Both crime and arrests fell in annualized terms too (crime: \~`r crime_per_year_pre`/yr to \~`r crime_per_year_post`/yr; arrests: \~`r arrest_per_year_pre`/yr to \~`r arrest_per_year_post`/yr), but arrests fell faster, so enforcement intensity declined relative to crime rather than simply tracking a drop in crime itself. A small number of tracts (`r n_dropped_pre` pre, `r n_dropped_post` post) had zero recorded crime and were excluded, since the ratio is undefined there.
-
-This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The negative binomial GEE model described in Methods tests whether the size of this decline depends on tract racial composition.
+The citywide comparison in Data indicates enforcement intensity declined between eras, but says nothing about whether that decline is uniform across neighborhoods. The negative binomial GEE model described in Methods tests whether the size of the decline depends on tract racial composition.
 
 ```{r}
 #| label: tbl-headline-gee
 #| tbl-cap: "Period x racial composition interaction, negative binomial GEE"
 
-# Drop tracts with zero recorded crime.
-gee_data <- arrest_over_crime |>
-  dplyr::filter(crime > 0, !is.na(pct_black_latino)) |>
-  dplyr::arrange(GEOID) |>
-  as.data.frame()
+gee_summary <- fit_interaction_gee(arrest_over_crime)
 
-# Have to calculate dispersion first to use for GEE.
-nb_fit <- MASS::glm.nb(
-  arrest ~ period * pct_black_latino + offset(log(crime)),
-  data = gee_data
+gee_term_labels <- c(
+  "(Intercept)" = "Intercept",
+  "periodpost" = "Period (DICFP Era)",
+  "pct_black_latino" = "Black/Latino (%)",
+  "periodpost:pct_black_latino" = "Period x Black/Latino (%)"
 )
 
-gee_fit <- geeM::geem(
-  arrest ~ period * pct_black_latino + offset(log(crime)),
-  id = GEOID,
-  family = MASS::negative.binomial(nb_fit$theta),
-  corstr = "exchangeable",
-  data = gee_data
-)
-
-gee_summary <- summary(gee_fit)
 data.frame(
   term = gee_summary$coefnames,
   estimate = gee_summary$beta,
@@ -113,10 +21,52 @@ data.frame(
   p_value = gee_summary$p,
   IRR = exp(gee_summary$beta)
 ) |>
+  dplyr::mutate(term = dplyr::recode(term, !!!gee_term_labels)) |>
+  dplyr::rename(
+    Term = term,
+    Estimate = estimate,
+    `Robust SE` = robust_se,
+    Wald = wald,
+    `p` = p_value
+  ) |>
   knitr::kable(digits = 3) |>
   kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
+```{r}
+#| label: sensitivity-transition-years
+#| include: false
+
+interaction_term <- "periodpost:pct_black_latino"
+headline <- gee_term(gee_summary, interaction_term)
+all_years <- gee_term(fit_interaction_gee(arrest_over_crime_all_years), interaction_term)
+
+era <- gee_term(gee_summary, "periodpost")
+composition <- gee_term(gee_summary, "pct_black_latino")
+
+# Racial gradient in each era:
+# the PredPol-era gradient,
+# and that gradient multiplied by the interaction
+# to give the DICFP-era equivalent.
+gradient_pre <- exp(gee_summary$beta[which(gee_summary$coefnames == "pct_black_latino")])
+gradient_post <- gradient_pre * exp(gee_summary$beta[which(gee_summary$coefnames == interaction_term)])
+gradient_pre <- scales::number(gradient_pre, accuracy = 0.01)
+gradient_post <- scales::number(gradient_post, accuracy = 0.01)
+
+# Era-over-era decline at each end of the composition range,
+# as a percentage drop rather than a rate ratio.
+drop_at <- function(share) {
+  b <- setNames(gee_summary$beta, gee_summary$coefnames)
+  ratio <- exp(b["periodpost"] + b[interaction_term] * share)
+  scales::percent(1 - ratio, accuracy = 1)
+}
+```
+
+Two coefficients are estimated precisely. Enforcement intensity fell sharply between eras: in a tract with no Black or Latino residents, the DICFP-era arrest rate per reported crime is `r era$irr` times the PredPol-era rate (*p* < .001), a decline of `r drop_at(0)`. Independently of era, tracts with larger Black and Latino populations sustain higher enforcement relative to reported crime: moving from a 0% to a 100% Black/Latino tract multiplies the arrest rate by `r composition$irr` (*p* < .001). The first result establishes that enforcement practice changed after PredPol ended; the second establishes that enforcement was unequally distributed across neighborhoods throughout.
+
+The interaction asks the question this project was designed around, namely whether the decline was itself uneven, and it is the smallest and least precisely estimated of the three terms: `r headline$estimate` (*p* = `r headline$p`). Its sign is positive, meaning enforcement intensity fell *less* where the Black and Latino population share was higher. A tract with no Black or Latino residents saw enforcement intensity fall by `r drop_at(0)` between eras; an entirely Black and Latino tract by `r drop_at(1)`. The reduction reached every kind of neighborhood, but not equally, and the neighborhoods already policed most heavily relative to reported crime were the ones it reached least.
+
+This estimate depends on the exclusion of 2015 described in Data. Retaining that year, when four divisions have arrest records but almost no crime records, attenuates the interaction to `r all_years$estimate` (*p* = `r all_years$p`). The mechanism is mechanical rather than substantive: crime enters the model as an offset, so tracts credited with five years of arrests against four years of crime carry inflated PredPol-era enforcement intensity, and the affected divisions are disproportionately Black and Latino, which is precisely the gradient this term measures. The corrected specification is reported here because the exclusion follows from a documented defect in the source data rather than from its effect on the estimate.
 
 ```{r}
 #| label: tbl-predicted-rates
@@ -150,14 +100,31 @@ scenarios$predicted_rate <- predict_rate(scenarios, exponentiate = TRUE)
 scenarios |>
   dplyr::mutate(
     period = dplyr::recode(period, pre = "PredPol Era (Before)", post = "DICFP Era (After)"),
-    pct_black_latino = scales::percent(pct_black_latino)
+    pct_black_latino = scales::percent(pct_black_latino),
+    predicted_rate = scales::number(predicted_rate, accuracy = 0.001)
   ) |>
   dplyr::select(pct_black_latino, period, predicted_rate) |>
   tidyr::pivot_wider(names_from = period, values_from = predicted_rate) |>
-  dplyr::rename(`Pct. Black/Latino` = pct_black_latino) |>
-  knitr::kable(digits = 3) |>
+  dplyr::rename(`Black/Latino (%)` = pct_black_latino) |>
+  knitr::kable() |>
   kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
 ```
+
+```{r}
+#| label: predicted-rate-values
+#| include: false
+
+rate_at <- function(era, share) {
+  scales::number(
+    scenarios$predicted_rate[scenarios$period == era & scenarios$pct_black_latino == share],
+    accuracy = 0.001
+  )
+}
+```
+
+@tbl-predicted-rates shows what those coefficients imply. Enforcement intensity falls at every level of racial composition: a tract with no Black or Latino residents goes from `r rate_at("pre", 0)` arrests per reported crime to `r rate_at("post", 0)`, and an entirely Black and Latino tract from `r rate_at("pre", 1)` to `r rate_at("post", 1)`. What does not fall is the distance between them. In the PredPol era the fully Black and Latino tract is arrested at `r gradient_pre` times the rate of the tract with none; in the DICFP era that ratio is `r gradient_post`. The disparity is not smaller after the transition; it is wider, and by the interaction term above that widening is statistically distinguishable from zero.
+
+This is the result that bears on the two readings set out at the start. DICFP is accompanied by a large and precisely estimated reduction in how much enforcement occurs, which is not what a purely cosmetic rebrand would produce. But the reduction was smallest in the neighborhoods already carrying the most enforcement relative to reported crime, so the racial gradient in enforcement intensity is wider under DICFP than it was under PredPol. On the evidence here, the program changed the volume of enforcement while leaving its distribution across neighborhoods no more even, and on the specific question of spatial concentration in Black and Latino neighborhoods, the optimistic reading finds no support.
 
 ```{r}
 #| label: fig-marginal-effects
