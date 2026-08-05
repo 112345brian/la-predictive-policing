@@ -1,0 +1,28 @@
+```{r}
+#| label: helpers
+#| include: false
+
+# Formats a period x stat summary table given a spec tibble (stat, label,
+# accuracy). Returns the kable-ready wide table plus a flat named list
+# (e.g. display$median_ratio_pre) for referencing individual values inline
+# in prose.
+stat_table <- function(stats, spec) {
+  long <- stats |>
+    tidyr::pivot_longer(-period, names_to = "stat", values_to = "value") |>
+    dplyr::left_join(spec, by = "stat") |>
+    dplyr::mutate(fmt = purrr::map2_chr(value, accuracy, scales::number, big.mark = ","))
+
+  display <- long |>
+    dplyr::mutate(key = paste(stat, period, sep = "_")) |>
+    dplyr::select(key, fmt) |>
+    tibble::deframe() |>
+    as.list()
+
+  table <- long |>
+    dplyr::select(period, label, fmt) |>
+    tidyr::pivot_wider(names_from = period, values_from = fmt) |>
+    dplyr::rename(Statistic = label)
+
+  list(table = table, display = display)
+}
+```
