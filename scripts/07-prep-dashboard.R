@@ -1,3 +1,6 @@
+# Preps tract-level crime/demographic data for the standalone dashboard.
+# Requires: 06-build-spatial.R
+
 source(here::here("scripts", "_pipeline-helpers.R"))
 
 lapd_spatial <- readRDS(here::here("data", "processed", "lapd-spatial.rds"))
@@ -28,9 +31,8 @@ acs_race <- readRDS(here::here("data", "processed", "acs-race.rds")) |>
     hispanic_or_latinoE
   )
 
-# Pick themodal (most common) neighborhood per tract instead, so each
-#  GEOID maps to exactly one neighborhood.
-
+# Pick the modal neighborhood per tract instead,
+# so each GEOID maps to exactly one neighborhood.
 neighborhood_lookup <- lapd_spatial |>
   sf::st_drop_geometry() |>
   dplyr::filter(!is.na(neighborhood)) |>
