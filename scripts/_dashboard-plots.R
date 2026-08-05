@@ -1,3 +1,11 @@
+# Plot and table builders for the standalone dashboard.
+
+# Bar chart:
+# racial composition of tracts in one crime tier.
+# Tiers are cut at the 33rd and 67th percentiles of the tract crime count,
+# so they are relative to this data.
+# "Other" is a residual (total minus White, Black, Hispanic).
+# It absorbs Asian residents, who are a large share of LA.
 plot_racial_distribution <- function(data, tier = "High") {
   bar_data <- data |>
     sf::st_drop_geometry() |>
@@ -49,6 +57,12 @@ plot_racial_distribution <- function(data, tier = "High") {
     )
 }
 
+# Table:
+# the ten tracts with the most crime per year, with neighborhood,
+# population and Black+Hispanic share.
+# Ranked on crimes_per_year,
+# which is a rate over the years the data covers.
+# Not a raw count.
 make_crime_table <- function(data) {
   data |>
     sf::st_drop_geometry() |>
@@ -78,6 +92,13 @@ make_crime_table <- function(data) {
     shiny::HTML()
 }
 
+# Scatter:
+# tract crime rate against Black+Hispanic population share,
+# with a linear fit.
+# Bivariate and descriptive.
+# Nothing is controlled for, and the outcome is reported crime,
+# so this shows an association in the recorded data
+# rather than a relationship between race and offending.
 plot_crime_by_race <- function(data) {
   scatter_data <- data |>
     sf::st_drop_geometry() |>
@@ -105,6 +126,10 @@ plot_crime_by_race <- function(data) {
     )
 }
 
+# Choropleth:
+# crimes per year by tract, viridis scale,
+# grey where a tract has no crime data.
+# Hovering gives the neighborhood, tract number and rate.
 plot_crime_counts <- function(data) {
   pal <- leaflet::colorNumeric(
     "viridis",
