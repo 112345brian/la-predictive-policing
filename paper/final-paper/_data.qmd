@@ -21,6 +21,7 @@ descriptive_stats |>
     )
   )) |>
   knitr::kable()
+  "mean_pct_black_latino_pop",   "Mean Black/Latino Population (%)",  0.1,       TRUE
 
 ```
 
