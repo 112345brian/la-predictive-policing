@@ -1,0 +1,730 @@
+---
+title: "Policing Spatial Concentration Under LAPD's Post-PredPol DICFP Program"
+author: "Brian Powers"
+bibliography: references.bib
+csl: american-political-science-association.csl
+papersize: letter
+
+margin-left: 1in
+margin-right: 1in
+margin-top: 1in
+margin-bottom: 1in
+cap-location: top
+linkcolor: black
+
+format:
+  pdf:
+    fontsize: 12pt
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    linestretch: 2
+
+execute:
+  echo: false
+  warning: false
+  message: false
+
+editor:
+  render-on-save: true
+---
+
+\clearpage
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+```{r}
+#| label: setup
+#| include: false
+
+library(ggplot2)
+
+data_dir <- "data"
+
+read_panel <- function(name) {
+  panel <- readr::read_csv(file.path(data_dir, name), col_types = readr::cols(GEOID = "c"))
+  # CSV drops factor order, and alphabetical puts post first.
+  panel$period <- factor(panel$period, levels = c("pre", "post"))
+  panel
+}
+
+arrest_over_crime <- read_panel("arrest-crime-panel.csv")
+arrest_over_crime_all_years <- read_panel("arrest-crime-panel-all-years.csv")
+
+period_years <- readr::read_csv(file.path(data_dir, "period-years.csv"), show_col_types = FALSE)
+n_years <- setNames(period_years$n_years, period_years$period)
+
+yearly_counts <- readr::read_csv(file.path(data_dir, "yearly-counts.csv"), show_col_types = FALSE)
+crime_backfill <- as.list(readr::read_csv(file.path(data_dir, "crime-backfill-stats.csv"), show_col_types = FALSE))
+
+# Middle era is DICFP's first two years: charted, not analyzed.
+era_colors <- c(pre = "#2c3e50", covid = "#8a8f99", post = "#c98a2c")
+era_text_labels <- c(
+  pre = "PredPol Era",
+  covid = "Early DICFP\n(COVID, excluded)",
+  post = "DICFP Era"
+)
+
+# 2015 dropped from the PredPol era; see Methods and Data Sources.
+PREDPOL_ANALYSIS_YEARS <- 2016:2019
+DICFP_ANALYSIS_YEARS <- 2022:2024
+
+span_of <- function(years) paste0(min(years), "-", max(years))
+
+era_span <- c(
+  pre = span_of(PREDPOL_ANALYSIS_YEARS),
+  post = span_of(DICFP_ANALYSIS_YEARS)
+)
+
+# Zero crime leaves the rate undefined; no composition, nothing to interact.
+analysis_sample <- function(data) {
+  dplyr::filter(data, crime > 0, !is.na(pct_black_latino))
+}
+
+# Headline model. NB GEE clustered by tract, crime as offset.
+# geem() wants theta supplied.
+fit_interaction_gee <- function(data) {
+  model_data <- data |>
+    analysis_sample() |>
+    dplyr::arrange(GEOID) |>
+    as.data.frame()
+
+  formula <- arrest ~ period * pct_black_latino + offset(log(crime))
+  nb_fit <- MASS::glm.nb(formula, data = model_data)
+
+  fit <- geeM::geem(
+    formula,
+    id = GEOID,
+    family = MASS::negative.binomial(nb_fit$theta),
+    corstr = "exchangeable",
+    data = model_data
+  )
+
+  summary(fit)
+}
+
+# One term, formatted for inline prose.
+gee_term <- function(gee_summary, term) {
+  i <- which(gee_summary$coefnames == term)
+  list(
+    estimate = scales::number(gee_summary$beta[i], accuracy = 0.001),
+    p = scales::number(gee_summary$p[i], accuracy = 0.001),
+    irr = scales::number(exp(gee_summary$beta[i]), accuracy = 0.01)
+  )
+}
+
+# Period x stat table from a spec of stat, label, accuracy, percent.
+# Returns the wide table for kable, plus a flat list keyed
+# display$median_ratio_pre for inline prose.
+stat_table <- function(stats, spec) {
+  if (!"percent" %in% names(spec)) {
+    spec$percent <- FALSE
+  }
+
+  long <- stats |>
+    tidyr::pivot_longer(-period, names_to = "stat", values_to = "value") |>
+    dplyr::left_join(spec, by = "stat") |>
+    dplyr::mutate(
+      fmt = purrr::pmap_chr(
+        list(value, accuracy, percent),
+        function(value, accuracy, percent) {
+          if (percent) {
+            scales::percent(value, accuracy = accuracy)
+          } else {
+            scales::number(value, accuracy = accuracy, big.mark = ",")
+          }
+        }
+      )
+    )
+
+  display <- long |>
+    dplyr::mutate(key = paste(stat, period, sep = "_")) |>
+    dplyr::select(key, fmt) |>
+    tibble::deframe() |>
+    as.list()
+
+  table <- long |>
+    dplyr::select(period, label, fmt) |>
+    tidyr::pivot_wider(names_from = period, values_from = fmt) |>
+    dplyr::rename(Statistic = label)
+
+  list(table = table, display = display)
+}
+```
+
+```{r}
+#| label: sample-values
+#| include: false
+
+modeled <- analysis_sample(arrest_over_crime)
+
+n_dropped_zero_crime <- sum(arrest_over_crime$crime == 0)
+n_dropped_no_demographics <- sum(
+  arrest_over_crime$crime > 0 & is.na(arrest_over_crime$pct_black_latino)
+)
+n_tract_periods_raw <- nrow(modeled)
+n_zero_arrest <- sum(modeled$arrest == 0)
+n_tract_periods <- scales::number(n_tract_periods_raw, big.mark = ",")
+pct_zero_arrest <- scales::percent(n_zero_arrest / n_tract_periods_raw, accuracy = 1)
+dispersion_ratio <- scales::number(
+  var(modeled$arrest) / mean(modeled$arrest),
+  accuracy = 1, big.mark = ","
+)
+
+pct_nibrs_overlap <- scales::percent(
+  crime_backfill$n_overlap_removed / crime_backfill$n_legacy_post_migration,
+  accuracy = 0.1
+)
+
+count_2024 <- function(name) {
+  scales::number(crime_backfill[[name]], big.mark = ",")
+}
+
+pct_2024_understated <- scales::percent(
+  1 - crime_backfill$total_2024_legacy_only / crime_backfill$total_2024,
+  accuracy = 1
+)
+```
+
+```{r}
+#| label: descriptive-values
+#| include: false
+
+descriptive_stats <- arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarize(
+    mean_arrests = mean(arrest) / n_years[as.character(period[1])],
+    n_arrests = sum(arrest) / n_years[as.character(period[1])],
+    mean_pct_black_latino_pop = mean(pct_black_latino, na.rm = TRUE),
+  )
+
+descriptive_stats_spec <- tibble::tribble(
+  ~stat,                        ~label,                              ~accuracy, ~percent,
+  "mean_arrests",                "Mean Arrests / Year",               1,         FALSE,
+  "n_arrests",                   "N Arrests / Year",                  1,         FALSE,
+  "mean_pct_black_latino_pop",   "Mean Black/Latino Population (%)",  0.1,       TRUE
+)
+
+descriptives <- stat_table(descriptive_stats, descriptive_stats_spec)
+
+period_comparison_stats <- arrest_over_crime |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(
+    mean_ratio = mean(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    median_ratio = median(arrest_crime_ratio[is.finite(arrest_crime_ratio)]),
+    arrest_per_year = sum(arrest) / n_years[as.character(period[1])],
+    crime_per_year = sum(crime) / n_years[as.character(period[1])],
+    n_tracts = sum(is.finite(arrest_crime_ratio)),
+    n_dropped = sum(!is.finite(arrest_crime_ratio))
+  )
+
+period_comparison_spec <- tibble::tribble(
+  ~stat,              ~label,           ~accuracy,
+  "mean_ratio",        "Mean Ratio",     0.001,
+  "median_ratio",      "Median Ratio",   0.001,
+  "arrest_per_year",   "Arrests / Year", 1,
+  "crime_per_year",    "Crimes / Year",  1,
+  "n_tracts",          "N Tracts",       1,
+  "n_dropped",         "N Dropped",      1
+)
+
+period_comparison <- stat_table(period_comparison_stats, period_comparison_spec)
+display <- period_comparison$display
+
+era_note <- paste0(
+  "PredPol era spans ", n_years["pre"], " years (", era_span["pre"], "); ",
+  "DICFP era spans ", n_years["post"], " years (", era_span["post"], "). ",
+  "Per-year figures are annualized totals divided by these spans."
+)
+```
+
+```{r}
+#| label: model-values
+#| include: false
+
+gee_summary <- fit_interaction_gee(arrest_over_crime)
+
+gee_term_labels <- c(
+  "(Intercept)" = "Intercept",
+  "periodpost" = "Period (DICFP Era)",
+  "pct_black_latino" = "Black/Latino (%)",
+  "periodpost:pct_black_latino" = "Period x Black/Latino (%)"
+)
+
+interaction_term <- "periodpost:pct_black_latino"
+headline <- gee_term(gee_summary, interaction_term)
+all_years <- gee_term(fit_interaction_gee(arrest_over_crime_all_years), interaction_term)
+
+era <- gee_term(gee_summary, "periodpost")
+composition <- gee_term(gee_summary, "pct_black_latino")
+
+# Gradient per era. The interaction carries the pre-era one to the post.
+gradient_pre <- exp(gee_summary$beta[which(gee_summary$coefnames == "pct_black_latino")])
+gradient_post <- gradient_pre * exp(gee_summary$beta[which(gee_summary$coefnames == interaction_term)])
+gradient_pre <- scales::number(gradient_pre, accuracy = 0.01)
+gradient_post <- scales::number(gradient_post, accuracy = 0.01)
+
+# Decline at each end of the composition range, as a percentage.
+drop_at <- function(share) {
+  b <- setNames(gee_summary$beta, gee_summary$coefnames)
+  ratio <- exp(b["periodpost"] + b[interaction_term] * share)
+  scales::percent(1 - ratio, accuracy = 1)
+}
+```
+
+```{r}
+#| label: predicted-rate-values
+#| include: false
+
+beta <- setNames(gee_summary$beta, gee_summary$coefnames)
+
+predict_rate <- function(scenarios, exponentiate = FALSE){
+  raw_output <- with(scenarios,
+    beta["(Intercept)"] +
+      beta["periodpost"] * (period == "post") +
+      beta["pct_black_latino"] * pct_black_latino +
+      beta["periodpost:pct_black_latino"] * (period == "post") *
+      pct_black_latino
+  )
+  if(exponentiate == TRUE) {
+    exp(raw_output)
+  }
+  else{
+    raw_output
+  }
+}
+
+scenarios <- data.frame(
+  period = rep(c("pre", "post"), times = 6),
+  pct_black_latino = rep(c(0, .2, .4, .6, .8, 1), each = 2)
+)
+scenarios$predicted_rate <- predict_rate(scenarios, exponentiate = TRUE)
+
+predicted_rate_stats <- scenarios |>
+  dplyr::mutate(stat = paste0("rate_", pct_black_latino * 100)) |>
+  dplyr::select(period, stat, predicted_rate) |>
+  tidyr::pivot_wider(names_from = stat, values_from = predicted_rate)
+
+predicted_rate_spec <- tibble::tribble(
+  ~stat,       ~label,  ~accuracy,
+  "rate_0",    "0%",    0.001,
+  "rate_20",   "20%",   0.001,
+  "rate_40",   "40%",   0.001,
+  "rate_60",   "60%",   0.001,
+  "rate_80",   "80%",   0.001,
+  "rate_100",  "100%",  0.001
+)
+
+predicted_rates <- stat_table(predicted_rate_stats, predicted_rate_spec)
+```
+
+## Executive Summary
+
+In April 2020 the Los Angeles Police Department discontinued PredPol, the place-based predictive policing program it had run since 2011, and replaced it with Data-Informed, Community-Focused Policing (DICFP). This study asks whether the spatial concentration of enforcement in Black and Latino neighborhoods changed across that transition, or persisted under a new name. The unit of analysis is the Los Angeles census tract. Enforcement intensity is measured as arrests relative to reported crime, and neighborhood composition as the combined Black and Latino population share from the American Community Survey. The comparison covers `r n_tract_periods` tract-periods across a PredPol era (2016-2019) and a DICFP era (2022-2024), with 2020-2021 excluded to separate the program change from the pandemic.
+
+Enforcement intensity fell substantially. The citywide median arrest-to-crime ratio dropped from `r display$median_ratio_pre` to `r display$median_ratio_post`, and a negative binomial GEE model puts the era effect at an incidence rate ratio of `r era$irr` (*p* \< .001). That decline was not evenly distributed. The interaction of period with tract racial composition is positive and statistically significant (`r headline$estimate`, *p* = `r headline$p`), meaning enforcement fell least where the Black and Latino population share was highest. The racial gradient in enforcement intensity is consequently wider under DICFP than it was under PredPol, rising from `r gradient_pre` to `r gradient_post`. The program reduced the volume of enforcement without making its distribution across neighborhoods more even.
+
+## Topic and Research Questions
+
+LAPD ran PredPol, a place-based predictive policing program, from 2011 to 2020 [@mohler-etal_2015_randomized-controlled-field]. It was discontinued that April, driven by COVID-era budget cuts and by criticism that it concentrated enforcement in already over-policed neighborhoods regardless of underlying crime rates [@stop-lapd-spying-coalition_2021_automating-banishment; @the-markup_2021_how-we-determined; @lum-isaac_2016_to-predict-and-serve]. LAPD replaced it that same month with Data-Informed, Community-Focused Policing (DICFP), whose stated goals were building trust, reducing violent crime, and assisting victims [@los-angeles-police-department_2020_data-informed-community-focused]. Optimists read DICFP as a genuine break from PredPol's targeting logic; pessimists read it as the same logic under a new name.
+
+Does LAPD's Data-Informed Community-Focused Policing (DICFP) program show a measurable break from the prior era's spatial concentration of policing activity in Black and Latino neighborhoods, consistent with DICFP's stated goals? Or does enforcement continue along the same spatial lines, past any plausible lagged effect of PredPol itself?
+
+Adjudicating between those two readings starts with the institutional record behind the transition itself. Chief Michel Moore's April 2020 memo attributed PredPol's shutdown specifically to the city's COVID-19 financial crisis and mayoral belt-tightening, not to the racial-bias scrutiny activists and journalists were raising at the same time [@cushing_2020_lapds-failed-predictive-policing]. That the same chief who discontinued PredPol said he still believed in location-based strategies going forward [@cushing_2020_lapds-failed-predictive-policing] is worth noting before taking DICFP's stated break from PredPol's logic at face value.
+
+Critics argue DICFP borrows its targeting logic from Operation LASER, LAPD's earlier person-based program, and continues to direct enforcement toward areas with already-high call volume [@wille_2021_lapds-new-data-driven-policing; @stop-lapd-spying-coalition_2021_automating-banishment]. That claim has been made qualitatively but not tested against tract-level enforcement data.
+
+LAPD's own April 2020 guidebook supports the critics on the narrow question of inputs. Hotspot targeting still runs on Calls for Service, crime and incident reports, and kernel density estimation over 500-1,000 foot "micro-geographic locations" [@los-angeles-police-department_2020_data-informed-community-focused, pp. 10-13, 22], functionally PredPol's approach. The community surveys DICFP adds measure trust and satisfaction as outcomes, and nothing in the document describes them feeding back into what counts as a hotspot. That an internal feedback mechanism is undocumented is not evidence that none exists, so this is an evidentiary gap rather than a settled fact.
+
+## Key Concepts and Variables
+
+Dependent variable: count of arrests per tract-period, modeled as a rate relative to reported crime (see below). Enforcement intensity is the underlying construct. Tracts where arrests exceed what reported crime would predict.
+
+Independent variable: policing-era period. The PredPol era (2016-2019) is compared against the DICFP era (2022-2024), with 2020-2021 dropped to isolate COVID-era confounds from the program change itself. 2015 belongs to the PredPol era but is excluded because four LAPD divisions are missing from that year's crime records while their arrest records are complete (see Methods and Data Sources).
+
+Unit of analysis: census tract, matched to ACS demographic data. Three groups of tracts are set aside before estimation. Tracts numbered in the 9800s are Census special land use, covering airports, ports, parks, and large institutions; they record incidents but house almost no residents, so a population share computed over a handful of people is not a measurement of neighborhood composition. `r n_dropped_zero_crime` tract-periods report no crime at all, which leaves the rate undefined. A further `r n_dropped_no_demographics` have no ACS composition estimate. That leaves `r n_tract_periods` tract-periods, and every count reported below describes that estimation sample rather than the larger table it is drawn from.
+
+Moderating variable: tract racial composition, the combined share of residents who are non-Hispanic Black or Hispanic/Latino of any race, from ACS table B03002. The two groups are combined because of a limitation in the categories, not because they are interchangeable. Census race and Hispanic origin are asked as separate questions, so "Black" in the tabulated categories means Black alone and not Hispanic, which excludes both Afro-Latino residents and anyone who reports Black together with another race. That exclusion is large: measuring Black residents as Black alone rather than in combination with another race understates the population by roughly 24%, and across the tracts analyzed here 15.9% of residents fall in a "two or more races" category while 23.7% are Hispanic residents reporting "some other race alone." Separating the two groups would therefore assign multiracial residents to one bucket, the other, or neither, leaving the coefficients sensitive to a coding decision with no principled answer. The combined measure is stable under that ambiguity, because a resident who is Black, Latino, or both falls inside it in every coding. What it gives up is the ability to attribute a change to one group rather than the other, and that cost is real: entered separately, the Black gradient does not change between eras while the Latino gradient widens. That specification is not reported as the headline because its estimates are less trustworthy on the same coding grounds, and because the Black share varies far less across tracts than the Latino share, leaving a null on the Black interaction as consistent with low power as with no effect.
+
+A second and more fundamental mismatch applies to any comparison between arrest records and population data. Census race is self-reported, with Hispanic origin recorded as a separate question from race, and permits multiple selections. LAPD's arrest records assign a single officer-perceived descent code. These do not measure the same construct: a resident who reports Black and Latino on the census appears in one arrest category or the other depending on an officer's judgment. Therefore, any ratio of arrest shares to population shares inherits both measurement systems. This is a general limitation of administrative enforcement data, not a defect of this dataset, but it constrains how finely racial categories can be resolved regardless of which specification is chosen.
+
+## Hypothesis and Theoretical Rationale
+
+The two readings are directly testable predictions, but they turn on two separate questions: whether enforcement intensity changed at all, and whether its concentration in Black and Latino neighborhoods changed with it. Crossing those questions gives four possible outcomes:
+
+|  | Gradient narrows | Gradient same or wider |
+|---|---|---|
+| **Enforcement falls** | 1. Genuine reform | 2. Volume reform without distributional reform |
+| **Enforcement flat** | 3. Targeted correction without volume change | 4. Cosmetic rebrand |
+
+Quadrant 1 is the genuine-reform reading and Quadrant 4 the cosmetic-rebrand reading. Quadrants 2 and 3 are not equivalent to either. This project tests both dimensions separately rather than assuming the answer falls on the diagonal.
+
+The bivariate hypothesis is that the change in enforcement intensity between the PredPol and DICFP eras depends on a tract's Black/Latino population share. The independent variable is the interaction of policing-era period with tract racial composition; the dependent variable is the tract's arrest count relative to reported crime. The null is that the two move independently, meaning enforcement intensity changed by the same proportion in every tract regardless of composition.
+
+The theoretical rationale for expecting continuity rather than reform comes from the institutional record above. A program discontinued for budget reasons rather than in response to the bias critique, and rebuilt on the same Calls-for-Service and crime-report inputs feeding the same kernel-density approach to the same micro-geographic grid, has no mechanism by which its spatial distribution would change. Stated goals about trust and community focus operate downstream of where enforcement gets sent, not on the targeting inputs themselves.
+
+## Methods and Data Sources
+
+This project tests whether LAPD's shift from PredPol to DICFP corresponds to a measurable change in enforcement intensity, and whether any such change is uniform across neighborhoods or concentrated by racial composition. The analysis compares tract-level arrest-to-crime ratios across the PredPol and DICFP eras, then tests whether the size of that change depends on a tract's Black/Latino population share.
+
+The analysis draws on three public sources. Crime and arrest records come from the Los Angeles Police Department's open data portal, retrieved through its SODA API: the legacy and current crime incident files [@los-angeles-police-department_2024_crime-data-2010; @los-angeles-police-department_2024_crime-data-2020] and the corresponding arrest files [@los-angeles-police-department_2024_arrest-data-2010; @los-angeles-police-department_2024_arrest-data-2020], covering 2016 through 2024. Tract racial composition comes from American Community Survey five-year estimates, table B03002, using the vintage matched to each era [@u-s-census-bureau_2020_american-community-survey; @u-s-census-bureau_2024_american-community-survey]. Tract boundaries come from the Census Bureau's TIGER/Line shapefiles [@u-s-census-bureau_2024_tiger-line-shapefiles]. Incidents and arrests are geocoded to tracts by spatial join and summed within each era, giving `r n_tract_periods` tract-periods in the estimation sample.
+
+To test whether the pre/post decline in enforcement intensity is uniform across neighborhoods or concentrated in majority-Black/Latino tracts, period is interacted with tract racial composition. Rather than model the arrest-to-crime ratio directly, arrest counts are modeled as a negative binomial rate with reported crime entered as an offset:
+
+$$\begin{aligned}
+\text{Arrests}_{it} &\sim \text{NegBinomial}(\mu_{it}, \theta) \\
+\log(\mu_{it}) &= \log(\text{Crime}_{it}) + \beta_0 + \beta_1 \text{Period}_t \\
+&+ \beta_2 \text{PctBlackLatino}_i + \beta_3 (\text{Period}_t \times \text{PctBlackLatino}_i)
+\end{aligned}$$
+
+where $i$ indexes census tract and $t$ indexes era. Fixing the coefficient on $\log(\text{Crime}_{it})$ at 1 is what makes this a model of the arrest *rate* relative to crime rather than of counts in isolation, and $\beta_3$ is the coefficient of interest. Because the link is logarithmic, a coefficient's exponent is an incidence rate ratio (IRR): the multiplicative change in the arrest rate per one-unit increase in that predictor, above 1 for a higher rate and below 1 for a lower one. Findings reports coefficients this way throughout.
+
+We use negative binomial rather than Poisson, because arrest counts are heavily overdispersed, with a raw variance-to-mean ratio of approximately `r dispersion_ratio`. And a population-averaged GEE clustered by tract rather than a GLM with cluster-robust standard errors added afterward, because each tract contributes one observation per era and the two are not independent. All three follow @semenza-etal_2022_eviction-crime-neighborhood, who model neighborhood crime counts across Philadelphia census tracts the same way and report that a GEE is more robust to misspecification of the correlation structure than fixed- or random-effects alternatives. The R implementation is included with the submitted analysis code.
+
+## Findings
+
+@tbl-descriptives reports arrest volume and tract racial composition for each era, and @fig-yearly-counts shows the citywide crime and arrest series by year. As a preliminary, unconditional check before fitting the negative binomial model described in Methods and Data Sources, the raw arrest-to-crime ratio is then compared citywide across the two eras. That comparison is intended only to establish whether enforcement intensity moved at all, before testing whether the movement varies by tract; it does not test the racial-composition interaction, the question the ratio approach is not suited to answer on its own.
+
+\center \[@tbl-descriptives about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+\center \[@fig-yearly-counts about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+The median arrest-to-crime ratio dropped from `r display$median_ratio_pre` in the PredPol era to `r display$median_ratio_post` in the DICFP era, and the mean dropped from `r display$mean_ratio_pre` to `r display$mean_ratio_post`. The decline is driven by arrests alone. Annualized reported crime is modestly higher in the DICFP era (\~`r display$crime_per_year_pre`/yr to \~`r display$crime_per_year_post`/yr), while annualized arrests fall by roughly 40% (\~`r display$arrest_per_year_pre`/yr to \~`r display$arrest_per_year_post`/yr). Enforcement intensity therefore declined while reported crime was flat to rising, rather than tracking any drop in crime itself. A small number of tracts (`r display$n_dropped_pre` pre, `r display$n_dropped_post` post) had zero recorded crime and were excluded, since the ratio is undefined there.
+
+\center \[@tbl-period-comparison about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+\center \[@fig-period-comparison about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+\center \[@fig-yearly-ratio about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+This citywide pattern is consistent with a genuine shift in enforcement intensity between eras, but it says nothing about whether that shift is uniform across neighborhoods. The hypothesis under test is that the change in enforcement intensity between eras depends on a tract's Black/Latino population share; the negative binomial GEE model estimates that dependence directly.
+
+\center \[@tbl-headline-gee about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+Two coefficients are estimated precisely. Enforcement intensity fell sharply between eras (IRR `r era$irr`, *p* \< .001, a decline of `r drop_at(0)` in a tract with no Black or Latino residents), and independently of era, tracts with larger Black and Latino populations sustain higher enforcement relative to reported crime (IRR `r composition$irr`, *p* \< .001). The first establishes that enforcement practice changed after PredPol ended; the second, that enforcement was unequally distributed across neighborhoods throughout.
+
+The interaction is the term the hypothesis turns on, and it is the smallest and least precisely estimated of the three: `r headline$estimate` (*p* = `r headline$p`). It clears conventional statistical significance, but by a far narrower margin than the two main effects, and its substantive magnitude is correspondingly modest. The sign is positive, meaning enforcement intensity fell *less* where the Black and Latino population share was higher. A tract with no Black or Latino residents saw enforcement intensity fall by `r drop_at(0)` between eras; an entirely Black and Latino tract by `r drop_at(1)`. The reduction reached every kind of neighborhood, but not equally, and the neighborhoods already policed most heavily relative to reported crime were the ones it reached least. On this evidence the null is rejected: the change in enforcement intensity does depend on tract racial composition. Retaining 2015, excluded for the missing crime records described above, attenuates the interaction to `r all_years$estimate` (*p* = `r all_years$p`), consistent with the inflated PredPol-era intensity in the affected divisions.
+
+\center \[@tbl-predicted-rates about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+@tbl-predicted-rates shows what those coefficients imply across the composition range, and @fig-marginal-effects plots the same relationship. Enforcement intensity falls at every level of composition, but the distance between the ends does not: in the PredPol era a fully Black and Latino tract is arrested at `r gradient_pre` times the rate of a tract with no Black or Latino residents, and in the DICFP era at `r gradient_post` times. The disparity is wider after the transition, not smaller.
+
+\center \[@fig-marginal-effects about here\]
+
+\raggedright
+
+\setlength{\parindent}{20pt}
+
+Enforcement fell, but its racial gradient widened rather than narrowed. The result lands in Quadrant 2 of the typology set out in Hypothesis and Theoretical Rationale (volume reform without distributional reform), not Quadrant 1 or Quadrant 4. That placement is interpreted in Discussion.
+
+## Discussion
+
+### What This Means for the Reform-Versus-Continuity Question
+
+Interestingly, the result lands in Quadrant 2 of the typology: volume reform without distributional reform. Enforcement intensity fell sharply and precisely across the transition, and a change of that size is not what a purely cosmetic rebrand would produce. But the decline was not even. It reached the least Black/Latino tracts fastest and the most Black/Latino tracts least, so the same spatial gradient that motivated PredPol's own bias critique is *wider* under DICFP than it was under PredPol. A program that meaningfully broke from the targeting logic critics objected to should have closed that gap, or at least held it flat.
+
+That combination is closer to what the institutional record in Topic and Research Questions would predict than what either original reading alone would predict. A program cut for budget reasons rather than in response to the bias critique, and rebuilt on the same Calls-for-Service and crime-report inputs feeding the same kernel-density approach to the same micro-geographic grid, would be expected to enforce less simply because there is less capacity to enforce with, without addressing the specific complaint that its predecessor concentrated enforcement in Black and Latino neighborhoods regardless of underlying crime. Nothing in the transition was designed to change that mechanism. This is also the first quantitative test of a claim that has so far been made only qualitatively, by comparing program documents rather than enforcement outcomes.
+
+### Limitations
+
+Several limitations bound what the interaction can mean, and the most consequential is the denominator. Reported crime is not an independent measure of crime: some reports are victim-initiated and roughly independent of patrol intensity, while others originate from officer-initiated contact, which is itself a function of the patrol a tract already receives [@lum-isaac_2016_to-predict-and-serve]. Numerator and denominator are generated by the same institution whose behavior the ratio is meant to describe. Reading the widening gradient as a change in enforcement behavior therefore requires that whatever changed in reporting between the eras did not change *differentially by tract racial composition*: the ratio absorbs citywide shifts in reporting without difficulty, but not one concentrated in the same neighborhoods whose gradient is being measured. Even granting that assumption, the result admits three readings the design cannot separate. Enforcement may have contracted least where it was already heaviest; the offense mix recorded in Black and Latino tracts may have shifted toward higher-yield categories; or reported crime may simply have risen faster in whiter tracts. Only the first is a claim about enforcement behavior.
+
+If the assumption fails, the likely direction is known even if the magnitude is not. Victim reporting is lower in over-policed and immigrant communities because of distrust of police [@desmond-etal_2016_police-violence-citizen; @theodore-habans_2016_policing-immigrant-communities], and the period boundary coincides with the 2020 protests and a documented national deterioration in police-community relations. Should reporting have declined more in Black and Latino tracts than elsewhere, the denominator would have contracted there specifically and the gradient would widen mechanically, making the estimate an upper bound rather than a measurement. The convenient assumption that officer-initiated inflation and victim underreporting offset one another is not available: the parallel divergence between hospital and police records of assault injury is race-skewed rather than symmetric [@magee-etal_2021_identifying-nonfatal-firearm]. Nor is there a tract-level remedy, since victimization surveys do not produce estimates below the state, metropolitan, or county level.
+
+Two further limitations are structural rather than measurement-related. Tract racial composition is not held fixed across eras, since each tract's estimate uses the ACS vintage matched to its own period, so the composition coefficient blends how enforcement differs between tracts of different composition with how a single tract's enforcement moves as its own composition changes. Those support different stories about who the widening gradient describes, and a Mundlak-style decomposition entering each tract's panel-mean composition as a separate term would distinguish them. Separately, the design is associative rather than causal. Three developments landed on the same several-month window as the transition, and none can be separated from the program change: the pandemic, which could have moved enforcement in either direction; the budget crisis LAPD itself cites for PredPol's discontinuation [@cushing_2020_lapds-failed-predictive-policing], which suggests DICFP may have been improvisation rather than considered reform; and the 2020 protests, which plausibly shifted both departmental practice and willingness to report crime. These do not bear symmetrically on the result, since a null would have had to survive all three, whereas the change found here is equally consistent with DICFP, with any one of them alone, or with some combination.
+
+### Future Research
+
+A discretion-based specification would test the same question from an angle that does not depend on the crime denominator at all. In this model, enforcement is compared across offense categories that differ in officer discretion, rather than against reported crime. We leave this for future research rather than attempt it here, since it trades the reporting-bias problem above for a different set of open questions of its own.
+
+### Conclusion
+
+The hypothesis stated in Hypothesis and Theoretical Rationale is supported, though not in the direction the reform reading anticipated. The null, that enforcement intensity changed by the same proportion regardless of tract composition, is rejected: the interaction is positive and statistically distinguishable from zero. But the sign runs the other way from what a genuine break in targeting logic would produce. Enforcement fell everywhere, and fell least where it was already most concentrated relative to reported crime.
+
+That the result lands in a quadrant neither reading anticipated is the study's main surprise. The optimistic and pessimistic readings of DICFP both assumed volume and distribution would move together: that real reform would show up as both less enforcement and a flatter racial gradient, and that a rebrand would show neither. What the data show is one without the other.
+
+Returning to the question posed at the outset, DICFP does not show a measurable break from the prior era's spatial concentration of enforcement in Black and Latino neighborhoods. It shows less enforcement overall, distributed slightly less evenly than before. That is a limit on the claim rather than a reason to withhold it. The finding is that the observed distribution of enforcement relative to reported crime became less even across racial composition, not that officers changed how they treat individuals of different races. That narrower claim is what the data support, and it is sufficient for the question this project asks, which is whether a program announced as reform reallocated enforcement rather than merely reducing it.
+
+\clearpage
+
+## Appendices
+
+```{r}
+#| label: tbl-descriptives
+#| tbl-cap: "Arrests and tract racial composition by era"
+
+descriptives$table |>
+  dplyr::rename(`PredPol Era (Before)` = pre, `DICFP Era (After)` = post) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position")) |>
+  kableExtra::footnote(
+    general = era_note,
+    general_title = "Note.",
+    footnote_as_chunk = TRUE
+  )
+```
+
+```{r}
+#| label: fig-yearly-counts
+#| fig-cap: "Citywide crime and arrests by year. Crime counts are deduplicated. The 2015 crime figure is shown as published and is understated, since four divisions are missing from that year; 2015 is excluded from the analysis for that reason."
+#| fig-width: 10
+#| fig-height: 7
+
+type_labels <- c(arrest = "Arrests", crime = "Crime")
+
+era_labels <- yearly_counts |>
+  dplyr::group_by(type, period) |>
+  dplyr::summarise(x = mean(year), y = max(n) * 1.04, .groups = "drop") |>
+  dplyr::mutate(label = era_text_labels[as.character(period)])
+
+# One continuous line: same measure throughout, transitions included.
+# Color each segment by where it starts, since geom_line would
+# otherwise break the line at era boundaries.
+yearly_segments <- yearly_counts |>
+  dplyr::arrange(type, year) |>
+  dplyr::group_by(type) |>
+  dplyr::mutate(xend = dplyr::lead(year), yend = dplyr::lead(n)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(!is.na(xend))
+
+ggplot2::ggplot(
+  yearly_counts,
+  ggplot2::aes(x = year, y = n, color = period)
+) +
+  ggplot2::geom_segment(
+    data = yearly_segments,
+    mapping = ggplot2::aes(xend = xend, yend = yend),
+    linewidth = 1
+  ) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::geom_text(
+    data = era_labels,
+    mapping = ggplot2::aes(x = x, y = y, label = label, color = period),
+    inherit.aes = FALSE,
+    fontface = "bold",
+    # Bottom-anchored, so two-line labels grow up and clear the line.
+    vjust = 0,
+    lineheight = 0.9
+  ) +
+  ggplot2::facet_wrap(
+    ~type, ncol = 1, scales = "free_y",
+    labeller = ggplot2::as_labeller(type_labels)
+  ) +
+  ggplot2::scale_x_continuous(breaks = sort(unique(yearly_counts$year))) +
+  ggplot2::scale_y_continuous(
+    labels = scales::label_comma(),
+    expand = ggplot2::expansion(mult = c(0, 0.15))
+  ) +
+  ggplot2::scale_color_manual(values = era_colors, guide = "none") +
+  ggplot2::labs(
+    x = NULL,
+    y = "Count"
+  ) +
+  ggplot2::theme_minimal()
+```
+
+```{r}
+#| label: tbl-period-comparison
+#| tbl-cap: "Arrest-to-crime ratio by era"
+
+period_comparison$table |>
+  dplyr::rename(`PredPol Era (Before)` = pre, `DICFP Era (After)` = post) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position")) |>
+  kableExtra::footnote(
+    general = era_note,
+    general_title = "Note.",
+    footnote_as_chunk = TRUE
+  )
+```
+
+```{r}
+#| label: fig-period-comparison
+#| fig-cap: "Tract-level arrest-to-crime ratio, PredPol era vs. DICFP era"
+
+max_ratio_by_period <- arrest_over_crime |>
+  dplyr::filter(is.finite(arrest_crime_ratio)) |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(max_ratio = max(arrest_crime_ratio))
+
+max_ratio_pre <- scales::number(max_ratio_by_period$max_ratio[max_ratio_by_period$period == "pre"], accuracy = 0.1)
+max_ratio_post <- scales::number(max_ratio_by_period$max_ratio[max_ratio_by_period$period == "post"], accuracy = 0.1)
+
+ggplot2::ggplot(
+  arrest_over_crime |>
+    dplyr::filter(is.finite(arrest_crime_ratio), arrest_crime_ratio < 2),
+  ggplot2::aes(x = period, y = arrest_crime_ratio)
+) +
+  ggplot2::geom_boxplot(outlier.shape = NA) +
+  ggplot2::geom_jitter(width = 0.15, alpha = 0.2, size = 0.8) +
+  ggplot2::scale_x_discrete(
+    labels = c(
+      pre = paste0("PredPol Era\n(", era_span["pre"], ")"),
+      post = paste0("DICFP Era\n(", era_span["post"], ")")
+    )
+  ) +
+  ggplot2::labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio",
+    caption = paste0(
+      "Tracts with ratio > 2 excluded for readability (max: ",
+      max_ratio_post, " post, ", max_ratio_pre, " pre)."
+    )
+  ) +
+  ggplot2::theme_minimal()
+```
+
+```{r}
+#| label: fig-yearly-ratio
+#| fig-cap: "Citywide arrest-to-crime ratio by year"
+#| fig-width: 10
+#| fig-height: 5
+
+yearly_ratio <- yearly_counts |>
+  tidyr::pivot_wider(names_from = type, values_from = n) |>
+  dplyr::mutate(ratio = arrest / crime)
+
+ratio_era_labels <- yearly_ratio |>
+  dplyr::group_by(period) |>
+  dplyr::summarise(x = mean(year), y = max(ratio) * 1.08, .groups = "drop") |>
+  dplyr::mutate(label = era_text_labels[as.character(period)])
+
+ratio_segments <- yearly_ratio |>
+  dplyr::arrange(year) |>
+  dplyr::mutate(xend = dplyr::lead(year), yend = dplyr::lead(ratio)) |>
+  dplyr::filter(!is.na(xend))
+
+ggplot2::ggplot(yearly_ratio, ggplot2::aes(x = year, y = ratio, color = period)) +
+  ggplot2::geom_segment(
+    data = ratio_segments,
+    mapping = ggplot2::aes(xend = xend, yend = yend),
+    linewidth = 1
+  ) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::geom_text(
+    data = ratio_era_labels,
+    mapping = ggplot2::aes(x = x, y = y, label = label, color = period),
+    inherit.aes = FALSE,
+    fontface = "bold"
+  ) +
+  ggplot2::scale_x_continuous(breaks = sort(unique(yearly_ratio$year))) +
+  ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.15))) +
+  ggplot2::scale_color_manual(values = era_colors, guide = "none") +
+  ggplot2::labs(
+    x = NULL,
+    y = "Arrest-to-Crime Ratio"
+  ) +
+  ggplot2::theme_minimal()
+```
+
+```{r}
+#| label: tbl-headline-gee
+#| tbl-cap: "Period x racial composition interaction, negative binomial GEE"
+
+data.frame(
+  term = gee_summary$coefnames,
+  estimate = gee_summary$beta,
+  robust_se = gee_summary$se.robust,
+  wald = gee_summary$wald.test,
+  p_value = gee_summary$p,
+  IRR = exp(gee_summary$beta)
+) |>
+  dplyr::mutate(term = dplyr::recode(term, !!!gee_term_labels)) |>
+  dplyr::rename(
+    Term = term,
+    Estimate = estimate,
+    `Robust SE` = robust_se,
+    Wald = wald,
+    `p` = p_value
+  ) |>
+  knitr::kable(digits = 3) |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+```{r}
+#| label: tbl-predicted-rates
+#| tbl-cap: "Predicted Arrest-to-Crime Rate by Era and Racial Composition"
+
+predicted_rates$table |>
+  dplyr::rename(`PredPol Era (Before)` = pre, `DICFP Era (After)` = post) |>
+  dplyr::rename(`Black/Latino (%)` = Statistic) |>
+  knitr::kable() |>
+  kableExtra::kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+```{r}
+#| label: fig-marginal-effects
+#| fig-cap: "Predicted Arrest-to-Crime Rate by Racial Composition and Era"
+
+
+pct_by_sequence <- tidyr::expand_grid(
+  period = factor(c("pre", "post"), levels = c("pre", "post")),
+  pct_black_latino = seq(0, 1, by = 0.001)
+)
+
+pct_by_sequence$predicted_rate <- predict_rate(
+  pct_by_sequence,
+  exponentiate = TRUE)
+
+pct_by_sequence |>
+  ggplot2::ggplot(
+  mapping = ggplot2::aes(x = pct_black_latino, y = predicted_rate, color = period)
+  ) +
+  ggplot2::geom_line() +
+  ggplot2::scale_x_continuous(labels = scales::percent_format()) +
+  ggplot2::annotate(
+    "text", x = 0.55, y = 0.44,
+    label = "PredPol Era (Before)", color = "black", hjust = 0.5
+  ) +
+  ggplot2::annotate(
+    "text", x = 0.55, y = 0.29,
+    label = "DICFP Era (After)", color = "black", hjust = 0.5
+  ) +
+  ggplot2::scale_color_manual(
+    values = c(pre = "#2c3e50", post = "#c98a2c"),
+    guide = "none"
+  ) +
+  ggplot2::labs(
+    x = "black/latino population (%)",
+    y = "predicted ratio of arrests per reported crime"
+  ) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()) +
+  ggplot2::coord_cartesian(clip = "off") +
+  ggplot2::theme(plot.margin = ggplot2::margin(r = 80))
+
+```
+
+\clearpage
+
+## References

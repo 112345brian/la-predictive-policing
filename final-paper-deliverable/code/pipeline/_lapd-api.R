@@ -1,0 +1,77 @@
+# LAPD Open Data Portal fetch functions.
+
+fetch_lapd_dataset <- function(resource_id, where_clause, cache_name) {
+  with_cache(cache_name, function() {
+    httr2::request(
+      paste0("https://data.lacity.org/resource/", resource_id, ".json")
+    ) |>
+      httr2::req_url_query(`$limit` = 2000000, `$where` = where_clause) |>
+      httr2::req_headers(`X-App-Token` = Sys.getenv("LA_CITY_APP_TOKEN")) |>
+      httr2::req_auth_basic(
+        Sys.getenv("LA_CITY_EMAIL"),
+        Sys.getenv("LA_CITY_PASSWORD")
+      ) |>
+      httr2::req_perform() |>
+      httr2::resp_body_json(simplifyVector = TRUE)
+  })
+}
+
+fetch_lapd_window <- function(
+  pre_id,
+  post_id,
+  date_field,
+  start,
+  end,
+  split,
+  cache_name
+) {
+  where_clause <- paste0(
+    date_field, " >= '", start, "T00:00:00' AND ",
+    date_field, " < '", end, "T00:00:00'"
+  )
+
+  with_cache(cache_name, function() {
+    dplyr::bind_rows(
+      fetch_lapd_dataset(
+        pre_id,
+        paste0(where_clause, " AND ", date_field, " < '", split, "T00:00:00'"),
+        paste0("window-", cache_name, "-pre.rds")
+      ),
+      fetch_lapd_dataset(
+        post_id,
+        paste0(where_clause, " AND ", date_field, " >= '", split, "T00:00:00'"),
+        paste0("window-", cache_name, "-post.rds")
+      )
+    ) |>
+      dplyr::mutate(!!date_field := as.POSIXct(.data[[date_field]], tz = LAPD_TZ))
+  })
+}
+
+fetch_lapd_periods <- function(
+  pre_id,
+  post_id,
+  date_field,
+  pre_cache,
+  post_cache
+) {
+  pre_where <- paste0(
+    date_field,
+    " >= '", PREDPOL_START, "T00:00:00' AND ",
+    date_field,
+    " < '", PREDPOL_END, "T00:00:00'"
+  )
+  post_where <- paste0(
+    date_field,
+    " >= '", DICFP_START, "T00:00:00' AND ",
+    date_field,
+    " < '", DICFP_END, "T00:00:00'"
+  )
+
+  pre <- fetch_lapd_dataset(pre_id, pre_where, pre_cache)
+  post <- fetch_lapd_dataset(post_id, post_where, post_cache)
+
+  bind_periods(pre, post) |>
+    dplyr::mutate(
+      !!date_field := as.POSIXct(.data[[date_field]], tz = LAPD_TZ)
+    )
+}
